@@ -1,38 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Bell, Download, LogOut, Menu } from "lucide-react";
+import { Bell, LogOut, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
-import { http } from "@/lib/api";
-
-const useInstallPrompt = () => {
-  const [evt, setEvt] = useState(null);
-  useEffect(() => {
-    const h = (e) => {
-      e.preventDefault();
-      setEvt(e);
-    };
-    window.addEventListener("beforeinstallprompt", h);
-    return () => window.removeEventListener("beforeinstallprompt", h);
-  }, []);
-  return evt;
-};
-
-const useStaffAlerts = (user) => {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!user || !["host", "admin"].includes(user.role)) return;
-    const load = () => http.get("/admin/summary").then((r) => setCount(r.data.unacked_tokens)).catch(() => {});
-    load();
-    const t = setInterval(load, 30000);
-    window.addEventListener("mbgg-alerts", load);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("mbgg-alerts", load);
-    };
-  }, [user]);
-  return count;
-};
+import { InstallButton, useStaffAlerts } from "@/components/HeaderWidgets";
 
 const links = (user) => [
   { to: "/", label: "Home", end: true },
@@ -77,7 +48,6 @@ const NavItems = ({ user, alerts, onClick }) => (
 export const SiteHeader = () => {
   const { user, logout } = useAuth();
   const nav = useNavigate();
-  const install = useInstallPrompt();
   const alerts = useStaffAlerts(user);
   const [open, setOpen] = useState(false);
   const doLogout = async () => {
@@ -99,11 +69,7 @@ export const SiteHeader = () => {
             <NavItems user={user} alerts={alerts} />
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {install && (
-              <button data-testid="install-app-button" onClick={() => install.prompt()} className="btn-ghost !min-h-[38px] !px-3 text-xs">
-                <Download className="h-4 w-4" /> Install
-              </button>
-            )}
+            <InstallButton />
             {user ? (
               <button data-testid="logout-button" onClick={doLogout} className="btn-ghost hidden !min-h-[38px] !px-3 text-xs md:inline-flex">
                 <LogOut className="h-4 w-4" /> Log out

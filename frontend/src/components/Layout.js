@@ -1,13 +1,14 @@
 import { Outlet } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader";
-import { GameRails, GameTicker } from "@/components/GameRails";
+import { GameTicker } from "@/components/GameTicker";
+import { ReminderBanner } from "@/components/ReminderBanner";
 
 export const Layout = () => (
   <div className="noise relative min-h-screen">
-    <GameRails />
-    <div className="relative z-10 xl:px-40 2xl:px-48">
+    <div className="relative z-10">
       <SiteHeader />
       <GameTicker />
+      <div className="px-4 sm:px-6"><ReminderBanner /></div>
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
         <Outlet />
       </main>

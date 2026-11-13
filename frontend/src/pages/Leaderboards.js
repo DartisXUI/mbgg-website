@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Loader } from "@/components/ProtectedRoute";
 import { HonorNote } from "@/components/SubscriberGate";
 import { MonthlyTopGames } from "@/components/MonthlyTopGames";
+import { QuarterlyPrize } from "@/components/QuarterlyPrize";
 
 const METRICS = [
   { key: "total_score", label: "Total score", fmt: (r) => r.total_score.toLocaleString(), sort: (a, b) => b.total_score - a.total_score },
@@ -55,6 +56,7 @@ export default function Leaderboards() {
         <h1 className="font-display text-4xl font-black uppercase sm:text-5xl split-title"><span className="r">Leader</span><span className="b">boards</span></h1>
       </div>
       <HonorNote />
+      <QuarterlyPrize />
       <div>
         <div className="eyebrow mb-2">Game</div>
         <Tabs value={game} onValueChange={setGame}>

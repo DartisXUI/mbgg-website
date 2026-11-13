@@ -56,6 +56,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "raffle_entries": [IndexModel([("year", ASCENDING), ("number", ASCENDING)], name="year_number", unique=True),
                        IndexModel([("user_id", ASCENDING), ("year", ASCENDING)], name="user_year")],
     "collections": [IndexModel([("user_id", ASCENDING), ("category", ASCENDING)], name="user_cat")],
+    "quarter_awards": [IndexModel([("year", ASCENDING), ("quarter", ASCENDING)], name="year_quarter", unique=True)],
     "raffle_bonuses": [IndexModel([("user_id", ASCENDING), ("year", ASCENDING), ("period", ASCENDING)],
                                    name="user_period", unique=True)],
     "prizes": [IndexModel([("user_id", ASCENDING), ("collect_by", ASCENDING)], name="user_collect"),
@@ -96,7 +97,24 @@ def public_user(u: dict) -> dict:
 def me_view(u: dict) -> dict:
     return public_user(u) | {"email": u["email"], "subscription_expires_at": u.get("subscription_expires_at"),
                              "subscription_started_at": u.get("subscription_started_at"),
-                             "has_password": bool(u.get("password_hash"))}
+                             "has_password": bool(u.get("password_hash")), "family": u.get("family", [])}
+
+
+def free_entry(u: dict) -> bool:
+    return is_subscriber(u) or u.get("role") in ("host", "admin")
+
+
+def eligible_family(u: dict, ids: list[str]) -> list[dict]:
+    fam = {f["id"]: f for f in u.get("family", [])}
+    out = []
+    for i in dict.fromkeys(ids):
+        f = fam.get(i)
+        if not f:
+            raise HTTPException(400, "Unknown family member")
+        if local_now().year - f["birth_year"] > 14:
+            raise HTTPException(400, f"{f['name']} is 15 or older and needs their own account")
+        out.append({"id": f["id"], "name": f["name"]})
+    return out
 
 
 def hash_pw(pw: str) -> str:
@@ -285,6 +303,7 @@ class CheckoutIn(BaseModel):
                      "donation_50", "donation_custom"]
     custom_amount: Optional[Decimal] = Field(default=None, max_digits=9, decimal_places=2)
     quantity: int = Field(default=1, ge=1, le=20)
+    family_ids: list[str] = Field(default_factory=list, max_length=10)
 
 
 def price_for(body: CheckoutIn) -> tuple[int, str]:
@@ -304,9 +323,10 @@ def price_for(body: CheckoutIn) -> tuple[int, str]:
 async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depends(get_current_user)):
     meta: dict = {}
     if body.product == "checkin":
-        if is_subscriber(user):
-            raise HTTPException(400, "Subscribers check in free. Use the free check-in button")
+        if free_entry(user):
+            raise HTTPException(400, "You check in free. Use the free check-in button")
         meta["date"] = local_now().date().isoformat()
+        meta["family"] = eligible_family(user, body.family_ids)
         if await db.checkins.find_one({"user_id": user["user_id"], "date": meta["date"]}, {"_id": 1}):
             raise HTTPException(400, "You're already checked in today")
     if body.product == "raffle":
@@ -317,7 +337,7 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
     recent = await db.payments.find_one(
         {"user_id": user["user_id"], "product": body.product, "amount_cents": amount, "status": "PENDING",
          "checkout_url": {"$exists": True}, "created_at": {"$gte": iso(now() - timedelta(minutes=20))},
-         "meta.date": meta.get("date")}, {"_id": 0}, sort=[("created_at", -1)])
+         "meta.date": meta.get("date"), "meta.family": meta.get("family")}, {"_id": 0}, sort=[("created_at", -1)])
     if recent and recent["product"] != "raffle":
         return {"checkout_id": recent["checkout_id"], "checkout_url": recent["checkout_url"]}
     origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
@@ -369,7 +389,8 @@ async def fulfil(p: dict) -> dict:
     elif p["product"] == "checkin":
         with suppress(DuplicateKeyError):
             await db.checkins.insert_one({"id": uuid.uuid4().hex, "user_id": p["user_id"], "date": p["meta"]["date"],
-                                          "via": "paid", "created_at": iso(now())})
+                                          "via": "paid", "family": p["meta"].get("family", []),
+                                          "created_at": iso(now())})
     elif p["product"] == "raffle":
         result["raffle_numbers"] = await assign_raffle_numbers(p["user_id"], p["meta"]["year"], p["meta"]["quantity"],
                                                               "purchase", p["checkout_id"])
@@ -490,7 +511,10 @@ async def dashboard(user: dict = Depends(get_current_user)):
     bonus_now = await period_progress(user["user_id"], ld.year, (ld.month - 1) // 2)
     bonuses = await db.raffle_bonuses.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
     prizes = await db.prizes.find({"user_id": user["user_id"]}, {"_id": 0}).sort("won_at", -1).to_list(50)
-    return {"user": me_view(user), "today": today, "checked_in_today": bool(checkins and checkins[0]["date"] == today),
+    today_checkin = checkins[0] if checkins and checkins[0]["date"] == today else None
+    return {"user": me_view(user), "today": today, "checked_in_today": bool(today_checkin),
+            "today_checkin": today_checkin, "free_entry": free_entry(user),
+            "unlogged_dates": await unlogged_checkins(user["user_id"]),
             "attendance": {"sessions": len(in_period), "since": start_date,
                            "door_value_cents": len(in_period) * CHECKIN_CENTS, "membership_cents": ANNUAL_CENTS},
             "recent_checkins": checkins[:8], "token": token, "month": month,
@@ -501,12 +525,71 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "payments": [payment_view(p) for p in payments]}
 
 
+async def unlogged_checkins(user_id: str) -> list[str]:
+    today = local_now().date()
+    rng = {"$gte": (today - timedelta(days=14)).isoformat(), "$lt": today.isoformat()}
+    dates = [c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
+                                                       {"_id": 0, "date": 1}).to_list(50)]
+    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": {"$in": dates}}))
+    return sorted([d for d in dates if d not in logged], reverse=True)
+
+
+@api.get("/me/reminders")
+async def reminders(user: dict = Depends(get_current_user)):
+    return {"unlogged_dates": await unlogged_checkins(user["user_id"])}
+
+
+class FamilyIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    birth_year: int
+
+
+@api.post("/me/family")
+async def add_family(body: FamilyIn, user: dict = Depends(get_current_user)):
+    if not 0 <= local_now().year - body.birth_year <= 14:
+        raise HTTPException(400, "Family members listed here must be under 15")
+    if len(user.get("family", [])) >= 10:
+        raise HTTPException(400, "Up to 10 family members")
+    f = {"id": uuid.uuid4().hex[:12], "name": body.name.strip(), "birth_year": body.birth_year}
+    await db.users.update_one({"user_id": user["user_id"]}, {"$push": {"family": f}})
+    return f
+
+
+@api.delete("/me/family/{fid}")
+async def delete_family(fid: str, user: dict = Depends(get_current_user)):
+    r = await db.users.update_one({"user_id": user["user_id"]}, {"$pull": {"family": {"id": fid}}})
+    if not r.modified_count:
+        raise HTTPException(404, "Family member not found")
+    return {"ok": True}
+
+
+class CheckinIn(BaseModel):
+    family_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+@api.post("/checkin/family")
+async def family_checkin(body: CheckinIn, user: dict = Depends(get_current_user)):
+    fam = eligible_family(user, body.family_ids)
+    if not fam:
+        raise HTTPException(400, "Pick who is with you")
+    q = {"user_id": user["user_id"], "date": local_now().date().isoformat()}
+    row = await db.checkins.find_one(q, {"_id": 0})
+    if not row:
+        raise HTTPException(400, "Check yourself in first")
+    have = {f["id"] for f in row.get("family", [])}
+    new = [f for f in fam if f["id"] not in have]
+    if new:
+        await db.checkins.update_one(q, {"$push": {"family": {"$each": new}}})
+    return {"ok": True, "added": len(new)}
+
+
 @api.post("/checkin")
-async def free_checkin(user: dict = Depends(get_current_user)):
-    if not is_subscriber(user):
+async def free_checkin(body: Optional[CheckinIn] = None, user: dict = Depends(get_current_user)):
+    if not free_entry(user):
         raise HTTPException(402, "Admission is $5. Use check in & pay")
+    family = eligible_family(user, body.family_ids if body else [])
     doc = {"id": uuid.uuid4().hex, "user_id": user["user_id"], "date": local_now().date().isoformat(),
-           "via": "subscription", "created_at": iso(now())}
+           "via": "subscription" if is_subscriber(user) else "staff", "family": family, "created_at": iso(now())}
     try:
         await db.checkins.insert_one(doc)
     except DuplicateKeyError:
@@ -619,6 +702,65 @@ async def leaderboards(game: Optional[str] = None, user: dict = Depends(get_curr
             "rows": out}
 
 
+# ---------- Quarterly subscriber top-score prize ----------
+def quarter_end(year: int, q: int) -> Date:
+    return Date(year, q * 3, 1) + relativedelta(months=1) - timedelta(days=1)
+
+
+def subscribed_on(u: dict, d: Date) -> bool:
+    s, e = u.get("subscription_started_at"), u.get("subscription_expires_at")
+    return bool(s and e) and parse_dt(s).astimezone(TZ).date() <= d <= parse_dt(e).astimezone(TZ).date()
+
+
+async def ytd_standings(year: int, end: Date) -> list[dict]:
+    rows = await db.game_logs.aggregate([
+        {"$match": {"played_at": {"$gte": f"{year}-01-01", "$lte": end.isoformat()}}},
+        {"$group": {"_id": "$user_id", "total_score": {"$sum": "$score"}, "games": {"$sum": 1}}}]).to_list(2000)
+    users = {u["user_id"]: u for u in await db.users.find(
+        {"user_id": {"$in": [r["_id"] for r in rows]}}, {"_id": 0}).to_list(2000)}
+    out = [{"user_id": r["_id"], "name": users[r["_id"]]["name"], "picture": users[r["_id"]].get("picture"),
+            "total_score": r["total_score"], "games": r["games"]}
+           for r in rows if r["_id"] in users and subscribed_on(users[r["_id"]], end)]
+    return sorted(out, key=lambda x: (-x["total_score"], x["games"]))
+
+
+async def award_quarter_prizes() -> None:
+    today = local_now().date()
+    for year in (today.year - 1, today.year):
+        for q in range(1, 5):
+            end = quarter_end(year, q)
+            if end >= today or await db.quarter_awards.find_one({"year": year, "quarter": q}, {"_id": 1}):
+                continue
+            standings = await ytd_standings(year, end)
+            w = standings[0] if standings else None
+            try:
+                await db.quarter_awards.insert_one({
+                    "id": uuid.uuid4().hex, "year": year, "quarter": q, "label": f"Q{q} {year}", "end": end.isoformat(),
+                    "winner_user_id": w and w["user_id"], "winner_name": w and w["name"],
+                    "total_score": w and w["total_score"], "created_at": iso(now())})
+            except DuplicateKeyError:
+                continue
+            if w:
+                won = end + timedelta(days=1)
+                await db.prizes.insert_one({
+                    "id": uuid.uuid4().hex, "user_id": w["user_id"], "user_name": w["name"],
+                    "prize": f"Top subscriber score prize · Q{q} {year}", "event": "Quarterly leaderboard",
+                    "won_at": won.isoformat(), "collect_by": (won + relativedelta(months=3)).isoformat(),
+                    "collected": False, "recorded_by": "Leaderboard (automatic)", "created_at": iso(now())})
+
+
+@api.get("/leaderboards/quarterly")
+async def quarterly(user: dict = Depends(get_current_user)):
+    await award_quarter_prizes()
+    today = local_now().date()
+    q = (today.month - 1) // 3 + 1
+    standings = [r for r in await ytd_standings(today.year, today)]
+    awards = await db.quarter_awards.find({"winner_user_id": {"$ne": None}}, {"_id": 0}).sort(
+        [("year", -1), ("quarter", -1)]).to_list(12)
+    return {"year": today.year, "quarter": q, "ends": quarter_end(today.year, q).isoformat(),
+            "standings": standings[:10], "winners": awards}
+
+
 # ---------- Collections & members ----------
 class CollectionIn(BaseModel):
     category: Literal["board", "card", "digital"]
@@ -680,10 +822,19 @@ async def member_profile(user_id: str):
 
 # ---------- Admin / host ----------
 @api.get("/admin/summary")
-async def admin_summary(user: dict = Depends(require_staff)):
+async def admin_summary(since: Optional[str] = None, user: dict = Depends(require_staff)):
     today = local_now().date().isoformat()
+    latest = await db.checkins.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
+    new = []
+    if since:
+        rows = await db.checkins.find({"created_at": {"$gt": since}}, {"_id": 0}).sort("created_at", 1).to_list(50)
+        names = {u["user_id"]: u["name"] for u in await db.users.find(
+            {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(50)}
+        new = [{"id": r["id"], "name": names.get(r["user_id"], "Someone"), "via": r["via"],
+                "family_count": len(r.get("family", [])), "created_at": r["created_at"]} for r in rows]
     return {"unacked_tokens": await db.token_uses.count_documents({"acknowledged": False}),
-            "checkins_today": await db.checkins.count_documents({"date": today})}
+            "checkins_today": await db.checkins.count_documents({"date": today}),
+            "latest_checkin_at": latest["created_at"] if latest else None, "new_checkins": new}
 
 
 @api.get("/admin/token-alerts")
@@ -706,8 +857,9 @@ async def admin_checkins(date: Optional[str] = None, user: dict = Depends(requir
     rows = await db.checkins.find({"date": d}, {"_id": 0}).sort("created_at", 1).to_list(500)
     users = {u["user_id"]: u for u in await db.users.find(
         {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0}).to_list(500)}
-    return {"date": d, "rows": [r | {"name": users.get(r["user_id"], {}).get("name"),
-                                     "is_subscriber": is_subscriber(users.get(r["user_id"], {}))} for r in rows]}
+    return {"date": d, "headcount": sum(1 + len(r.get("family", [])) for r in rows),
+            "rows": [r | {"name": users.get(r["user_id"], {}).get("name"), "family": r.get("family", []),
+                          "is_subscriber": is_subscriber(users.get(r["user_id"], {}))} for r in rows]}
 
 
 @api.get("/admin/users")
@@ -770,7 +922,8 @@ async def session_summary(date: Optional[str] = None, staff: dict = Depends(requ
         out.append(g | {"players": len(g["players"])})
     recent = sorted(set(await db.checkins.distinct("date")) | set(await db.game_logs.distinct("played_at")),
                     reverse=True)[:30]
-    return {"date": d, "attendees": await db.checkins.count_documents({"date": d}), "logs": len(logs),
+    day_rows = await db.checkins.find({"date": d}, {"_id": 0, "family": 1}).to_list(500)
+    return {"date": d, "attendees": sum(1 + len(r.get("family", [])) for r in day_rows), "logs": len(logs),
             "loggers": len({lg["user_id"] for lg in logs}), "games": out, "recent_dates": recent}
 
 

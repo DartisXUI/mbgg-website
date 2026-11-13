@@ -35,6 +35,7 @@ export const LogGameDialog = ({ genres, titles, playerTag, onSaved }) => {
       setF({ ...blank, title: f.title, genre: f.genre });
       setOpen(false);
       onSaved();
+      window.dispatchEvent(new Event("mbgg-logged"));
     } catch (err) {
       toast.error(errMsg(err));
     } finally {

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { http, errMsg, adelaideToday } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { GrantMembershipButton, PrizeTracker, SessionSummary } from "@/components/AdminExtras";
+import { markCheckinsSeen } from "@/components/HeaderWidgets";
 
 const when = (s) => new Date(s).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
@@ -49,16 +50,20 @@ const CheckinRoster = () => {
   const [data, setData] = useState(null);
   useEffect(() => {
     http.get("/admin/checkins", { params: { date } }).then((r) => setData(r.data));
+    markCheckinsSeen();
   }, [date]);
   return (
     <div className="space-y-4">
       <Input data-testid="admin-checkin-date-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11 w-48 bg-[#121826]" />
       <div className="panel !p-0">
-        <div data-testid="admin-checkin-count" className="border-b border-white/10 px-5 py-3 font-display text-xl font-bold uppercase">{data?.rows.length || 0} checked in</div>
+        <div data-testid="admin-checkin-count" className="border-b border-white/10 px-5 py-3 font-display text-xl font-bold uppercase">{data?.headcount || 0} people · {data?.rows.length || 0} check-ins</div>
         {data?.rows.map((r) => (
           <div key={r.id} data-testid={`admin-checkin-row-${r.user_id}`} className="flex items-center gap-3 border-b border-white/5 px-5 py-3">
-            <span className="flex-1 font-semibold">{r.name}</span>
-            <span className={`text-sm ${r.via === "subscription" ? "text-mb-orange" : "text-mb-blue"}`}>{r.via === "subscription" ? "Member · free drink & snack" : "Paid $5"}</span>
+            <div className="flex-1">
+              <div className="font-semibold">{r.name}</div>
+              {r.family.length > 0 && <div data-testid={`admin-checkin-family-${r.user_id}`} className="text-xs text-slate-400">+ {r.family.map((f) => f.name).join(", ")} (under 15, free)</div>}
+            </div>
+            <span className={`text-sm ${r.via === "paid" ? "text-mb-blue" : "text-mb-orange"}`}>{{ subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5" }[r.via]}</span>
           </div>
         ))}
       </div>

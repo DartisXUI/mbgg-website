@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { http, money } from "@/lib/api";
 import { Loader } from "@/components/ProtectedRoute";
-import { CheckInCard } from "@/components/account/CheckInCard";
+import { CheckInCard } from "@/components/account/CheckInPanel";
+import { FamilyCard } from "@/components/account/FamilyCard";
 import { MembershipCard } from "@/components/account/MembershipCard";
 import { TokenCard } from "@/components/account/TokenCard";
 import { DonateCard, RaffleCard } from "@/components/account/MoneyCards";
@@ -55,6 +56,7 @@ export default function Account() {
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <CheckInCard data={data} reload={load} />
         <MembershipCard data={data} />
+        <FamilyCard data={data} reload={load} />
         <TokenCard data={data} reload={load} />
         <BonusCard data={data} />
         <RaffleCard data={data} />
