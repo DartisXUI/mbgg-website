@@ -41,10 +41,11 @@ export const RaffleCard = ({ data }) => {
       <div className="mt-4">
         <div className="text-xs text-slate-500">Your numbers this year</div>
         <div data-testid="raffle-numbers" className="mt-2 flex flex-wrap gap-2">
-          {data.raffle_numbers.length ? data.raffle_numbers.map((n) => (
-            <span key={n} className="rounded-md border border-[var(--mb-orange)]/40 px-2 py-1 font-mono-x text-sm text-mb-orange">#{String(n).padStart(4, "0")}</span>
+          {data.raffle_entries.length ? data.raffle_entries.map((r) => (
+            <span key={r.number} title={r.source === "bonus" ? "Free bonus entry" : "Purchased"} className={`rounded-md border px-2 py-1 font-mono-x text-sm ${r.source === "bonus" ? "border-[var(--mb-blue)]/50 text-mb-blue" : "border-[var(--mb-orange)]/40 text-mb-orange"}`}>#{String(r.number).padStart(4, "0")}{r.source === "bonus" ? " ★" : ""}</span>
           )) : <span className="text-sm text-slate-500">No entries yet</span>}
         </div>
+        {data.raffle_entries.some((r) => r.source === "bonus") && <div className="mt-2 text-[11px] text-slate-500">★ free bonus entries for logging your games</div>}
       </div>
     </div>
   );

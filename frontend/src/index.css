@@ -27,6 +27,7 @@
     --mb-red: #ff3b5c;
     --mb-blue: #00e5ff;
     --mb-orange: #ff8c00;
+    --mb-logo-blue: #12a4f5;
     --mb-void: #0b0f19;
     --mb-surface: #121826;
     --mb-card: #1a2234;
@@ -86,8 +87,8 @@
   .text-mb-red { color: var(--mb-red); }
   .text-mb-blue { color: var(--mb-blue); }
   .text-mb-orange { color: var(--mb-orange); }
-  .split-title .r { color: var(--mb-red); }
-  .split-title .b { color: var(--mb-blue); }
+  .split-title .r { color: #ffffff; }
+  .split-title .b { color: var(--mb-logo-blue); }
 }
 
 .rail-tile {

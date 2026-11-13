@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { http, errMsg, adelaideToday } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { GrantMembershipButton, PrizeTracker, SessionSummary } from "@/components/AdminExtras";
 
 const when = (s) => new Date(s).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
@@ -87,9 +88,10 @@ const UsersTab = () => {
         <div key={u.user_id} data-testid={`admin-user-row-${u.user_id}`} className="flex flex-wrap items-center gap-3 border-b border-white/5 px-5 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1 font-semibold">{u.name} {u.is_subscriber && <BadgeCheck className="h-4 w-4 text-mb-orange" />}</div>
-            <div className="truncate text-xs text-slate-500">{u.email}</div>
+            <div className="truncate text-xs text-slate-500">{u.email}{u.is_subscriber ? ` · member until ${u.subscription_expires_at.slice(0, 10)}` : ""}</div>
           </div>
           <span className="eyebrow">{u.role}</span>
+          {user.role === "admin" && <GrantMembershipButton u={u} onDone={load} />}
           {user.role === "admin" && u.role !== "admin" && (
             <button data-testid={`admin-promote-host-button-${u.user_id}`} onClick={() => setRole(u.user_id, u.role === "host" ? "member" : "host")} className={u.role === "host" ? "btn-ghost" : "btn-orange"}>
               {u.role === "host" ? "Remove host" : "Make host"}
@@ -109,13 +111,17 @@ export default function Admin() {
         <h1 className="font-display text-4xl font-black uppercase sm:text-5xl">Host desk</h1>
       </div>
       <Tabs defaultValue="tokens">
-        <TabsList className="bg-[#121826]">
+        <TabsList className="h-auto flex-wrap bg-[#121826]">
           <TabsTrigger value="tokens" data-testid="admin-tab-tokens">Game choices</TabsTrigger>
           <TabsTrigger value="checkins" data-testid="admin-tab-checkins">Check-ins</TabsTrigger>
+          <TabsTrigger value="sessions" data-testid="admin-tab-sessions">Session summary</TabsTrigger>
+          <TabsTrigger value="prizes" data-testid="admin-tab-prizes">Prizes</TabsTrigger>
           <TabsTrigger value="users" data-testid="admin-tab-users">Members</TabsTrigger>
         </TabsList>
         <TabsContent value="tokens" className="pt-4"><TokenAlerts /></TabsContent>
         <TabsContent value="checkins" className="pt-4"><CheckinRoster /></TabsContent>
+        <TabsContent value="sessions" className="pt-4"><SessionSummary /></TabsContent>
+        <TabsContent value="prizes" className="pt-4"><PrizeTracker /></TabsContent>
         <TabsContent value="users" className="pt-4"><UsersTab /></TabsContent>
       </Tabs>
     </div>

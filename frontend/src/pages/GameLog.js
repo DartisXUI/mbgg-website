@@ -7,7 +7,7 @@ import { http, errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Loader } from "@/components/ProtectedRoute";
 import { LogGameDialog } from "@/components/LogGameDialog";
-import { HonorNote, SubscriberGate } from "@/components/SubscriberGate";
+import { HonorNote } from "@/components/SubscriberGate";
 
 const ord = (n) => `${n}${["th", "st", "nd", "rd"][(n % 100 >> 3) ^ 1 && n % 10] || "th"}`;
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -63,14 +63,12 @@ export default function GameLog() {
   const [logs, setLogs] = useState(null);
   const [genres, setGenres] = useState([]);
   const [tab, setTab] = useState("all");
-  const allowed = user.is_subscriber || ["host", "admin"].includes(user.role);
   const load = useCallback(() => http.get("/logs/me").then((r) => setLogs(r.data)), []);
   useEffect(() => {
     load();
     http.get("/meta/genres").then((r) => setGenres(r.data));
   }, [load]);
   const titles = useMemo(() => [...new Set((logs || []).map((l) => l.title))], [logs]);
-  if (!allowed) return <SubscriberGate what="Personal game tracking" />;
   if (!logs) return <Loader />;
   const rows = tab === "all" ? logs : logs.filter((l) => l.title === tab);
   const del = async (id) => {

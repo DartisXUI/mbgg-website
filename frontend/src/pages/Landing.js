@@ -9,7 +9,6 @@ const PERKS = [
   { icon: Coffee, title: "Free drink & snack", text: "1 x drink and snack (hot, cold or otherwise) during free admission sessions." },
   { icon: Crown, title: "Guaranteed game choice", text: "1 x guaranteed game pick every month. Tap your token and the hosts are alerted." },
   { icon: Gift, title: "Win without being there", text: "Raffle prizes are held for you until collection, for up to 3 months." },
-  { icon: Trophy, title: "Game log & leaderboards", text: "Log your plays and climb the 365-day leaderboards." },
 ];
 
 const Offer = () => {
@@ -89,6 +88,16 @@ const ForEveryone = () => (
       <Ticket className="h-6 w-6 text-mb-red" />
       <h3 className="mt-3 font-display text-xl font-bold uppercase">Donate & raffle</h3>
       <p className="mt-1 text-sm text-slate-400">Chip in $5, $10, $20, $50 or any amount, and grab lucky-number entries for the end-of-year free session raffle.</p>
+    </div>
+    <div className="panel panel-blue md:col-span-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <Trophy className="h-8 w-8 shrink-0 text-mb-blue" />
+        <div className="flex-1">
+          <h3 className="font-display text-xl font-bold uppercase">Game log & leaderboards</h3>
+          <p className="mt-1 text-sm text-slate-400">Log your plays and climb the 365-day leaderboards. Log a game for every session you check in to across a 2-month block (Jan–Feb, Mar–Apr, May–Jun, Jul–Aug, Sep–Oct, Nov–Dec) and get 3 free entries into the end-of-year lucky number raffle.</p>
+        </div>
+        <Link to="/games" data-testid="landing-gamelog-link" className="btn-blue">Start logging</Link>
+      </div>
     </div>
     <div className="panel panel-orange md:col-span-3">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

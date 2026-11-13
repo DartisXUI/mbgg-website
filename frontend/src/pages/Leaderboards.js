@@ -4,7 +4,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { http, plural } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Loader } from "@/components/ProtectedRoute";
-import { HonorNote, SubscriberGate } from "@/components/SubscriberGate";
+import { HonorNote } from "@/components/SubscriberGate";
+import { MonthlyTopGames } from "@/components/MonthlyTopGames";
 
 const METRICS = [
   { key: "total_score", label: "Total score", fmt: (r) => r.total_score.toLocaleString(), sort: (a, b) => b.total_score - a.total_score },
@@ -43,12 +44,9 @@ export default function Leaderboards() {
   const [game, setGame] = useState("all");
   const [metric, setMetric] = useState("total_score");
   const [data, setData] = useState(null);
-  const allowed = user.is_subscriber || ["host", "admin"].includes(user.role);
   useEffect(() => {
-    if (!allowed) return;
     http.get("/leaderboards", { params: game === "all" ? {} : { game } }).then((r) => setData(r.data));
-  }, [game, allowed]);
-  if (!allowed) return <SubscriberGate what="The 365-day leaderboards" />;
+  }, [game]);
   if (!data) return <Loader />;
   return (
     <div data-testid="leaderboards-page" className="space-y-6">
@@ -75,6 +73,7 @@ export default function Leaderboards() {
         </Tabs>
       </div>
       <Board rows={data.rows} metric={metric} me={user.user_id} />
+      <MonthlyTopGames />
     </div>
   );
 }

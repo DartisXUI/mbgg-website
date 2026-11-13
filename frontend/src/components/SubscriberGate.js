@@ -16,6 +16,6 @@ export const SubscriberGate = ({ what }) => (
 
 export const HonorNote = () => (
   <p data-testid="honor-disclaimer" className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-slate-400">
-    Honour system: players enter their own results so our hosts don't have to. Stats are only as accurate as what members log, and are only available to subscribers.
+    Honour system: players enter their own results so our hosts don't have to. Stats are only as accurate as what members log. Log a game for every session you check in to across a 2-month block and you get 3 free lucky-number raffle entries.
   </p>
 );

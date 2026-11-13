@@ -6,6 +6,7 @@ import { CheckInCard } from "@/components/account/CheckInCard";
 import { MembershipCard } from "@/components/account/MembershipCard";
 import { TokenCard } from "@/components/account/TokenCard";
 import { DonateCard, RaffleCard } from "@/components/account/MoneyCards";
+import { BonusCard, PrizesCard } from "@/components/account/BonusPrizeCards";
 
 const STATUS = { COMPLETED: "text-emerald-400", PENDING: "text-mb-orange", CANCELED: "text-slate-500" };
 
@@ -55,7 +56,9 @@ export default function Account() {
         <CheckInCard data={data} reload={load} />
         <MembershipCard data={data} />
         <TokenCard data={data} reload={load} />
+        <BonusCard data={data} />
         <RaffleCard data={data} />
+        <PrizesCard data={data} />
         <DonateCard />
         <History data={data} />
       </div>

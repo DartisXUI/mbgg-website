@@ -4,11 +4,13 @@ import os
 import random
 import uuid
 from contextlib import suppress
-from datetime import datetime, timezone, timedelta
+from datetime import date as Date, datetime, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal, Optional
 from zoneinfo import ZoneInfo
+
+from dateutil.relativedelta import relativedelta
 
 import bcrypt
 import httpx
@@ -54,7 +56,13 @@ INDEXES: dict[str, list[IndexModel]] = {
     "raffle_entries": [IndexModel([("year", ASCENDING), ("number", ASCENDING)], name="year_number", unique=True),
                        IndexModel([("user_id", ASCENDING), ("year", ASCENDING)], name="user_year")],
     "collections": [IndexModel([("user_id", ASCENDING), ("category", ASCENDING)], name="user_cat")],
+    "raffle_bonuses": [IndexModel([("user_id", ASCENDING), ("year", ASCENDING), ("period", ASCENDING)],
+                                   name="user_period", unique=True)],
+    "prizes": [IndexModel([("user_id", ASCENDING), ("collect_by", ASCENDING)], name="user_collect"),
+               IndexModel([("collected", ASCENDING), ("collect_by", ASCENDING)], name="collected_by")],
 }
+BONUS_ENTRIES = 3
+PERIOD_NAMES = ["Jan–Feb", "Mar–Apr", "May–Jun", "Jul–Aug", "Sep–Oct", "Nov–Dec"]
 
 
 def now() -> datetime:
@@ -336,6 +344,19 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
     return {"checkout_id": checkout_id, "checkout_url": link["url"]}
 
 
+async def assign_raffle_numbers(user_id: str, year: int, qty: int, source: str, ref: str) -> list[int]:
+    numbers: list[int] = []
+    while len(numbers) < qty:
+        n = random.randint(1, 9999)
+        try:
+            await db.raffle_entries.insert_one({"id": uuid.uuid4().hex, "user_id": user_id, "year": year, "number": n,
+                                                "source": source, "ref": ref, "created_at": iso(now())})
+            numbers.append(n)
+        except DuplicateKeyError:
+            continue
+    return numbers
+
+
 async def fulfil(p: dict) -> dict:
     result: dict = {}
     if p["product"] == "annual":
@@ -350,17 +371,8 @@ async def fulfil(p: dict) -> dict:
             await db.checkins.insert_one({"id": uuid.uuid4().hex, "user_id": p["user_id"], "date": p["meta"]["date"],
                                           "via": "paid", "created_at": iso(now())})
     elif p["product"] == "raffle":
-        numbers = []
-        while len(numbers) < p["meta"]["quantity"]:
-            n = random.randint(1, 9999)
-            try:
-                await db.raffle_entries.insert_one({"id": uuid.uuid4().hex, "user_id": p["user_id"],
-                                                    "year": p["meta"]["year"], "number": n,
-                                                    "checkout_id": p["checkout_id"], "created_at": iso(now())})
-                numbers.append(n)
-            except DuplicateKeyError:
-                continue
-        result["raffle_numbers"] = numbers
+        result["raffle_numbers"] = await assign_raffle_numbers(p["user_id"], p["meta"]["year"], p["meta"]["quantity"],
+                                                              "purchase", p["checkout_id"])
     await db.payments.update_one({"checkout_id": p["checkout_id"]}, {"$set": {"fulfilled": True, "result": result}})
     return p | {"fulfilled": True, "result": result}
 
@@ -417,10 +429,50 @@ async def reconcile_pending(user_id: str) -> None:
             await verify_payment(p)
 
 
+# ---------- Raffle bonus (log every attended session in a 2-month period) ----------
+def period_bounds(year: int, idx: int) -> tuple[Date, Date]:
+    start = Date(year, idx * 2 + 1, 1)
+    return start, start + relativedelta(months=2) - timedelta(days=1)
+
+
+async def period_progress(user_id: str, year: int, idx: int) -> dict:
+    s, e = period_bounds(year, idx)
+    rng = {"$gte": s.isoformat(), "$lte": e.isoformat()}
+    dates = sorted({c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
+                                                              {"_id": 0, "date": 1}).to_list(200)})
+    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": rng}))
+    missing = [d for d in dates if d not in logged]
+    return {"year": year, "period": idx, "label": f"{PERIOD_NAMES[idx]} {year}", "start": s.isoformat(),
+            "end": e.isoformat(), "sessions": len(dates), "logged_sessions": len(dates) - len(missing),
+            "missing_dates": missing, "qualifies": bool(dates) and not missing,
+            "raffle_year": year if idx < 5 else year + 1}
+
+
+async def award_bonuses(user_id: str) -> None:
+    today = local_now().date()
+    periods = [(today.year - 1, 5)] + [(today.year, i) for i in range(6)]
+    for year, idx in periods:
+        if period_bounds(year, idx)[1] >= today:
+            continue
+        if await db.raffle_bonuses.find_one({"user_id": user_id, "year": year, "period": idx}, {"_id": 1}):
+            continue
+        prog = await period_progress(user_id, year, idx)
+        if not prog["qualifies"]:
+            continue
+        try:
+            await db.raffle_bonuses.insert_one({"id": uuid.uuid4().hex, "user_id": user_id, "year": year, "period": idx,
+                                                "label": prog["label"], "entries": BONUS_ENTRIES,
+                                                "raffle_year": prog["raffle_year"], "created_at": iso(now())})
+        except DuplicateKeyError:
+            continue
+        await assign_raffle_numbers(user_id, prog["raffle_year"], BONUS_ENTRIES, "bonus", f"{year}-{idx}")
+
+
 # ---------- Dashboard / check-in ----------
 @api.get("/me/dashboard")
 async def dashboard(user: dict = Depends(get_current_user)):
     await reconcile_pending(user["user_id"])
+    await award_bonuses(user["user_id"])
     user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
     today = local_now().date().isoformat()
     month = local_now().strftime("%Y-%m")
@@ -433,11 +485,18 @@ async def dashboard(user: dict = Depends(get_current_user)):
     raffle = await db.raffle_entries.find({"user_id": user["user_id"], "year": local_now().year},
                                           {"_id": 0}).sort("number", 1).to_list(500)
     payments = await db.payments.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(10)
+    ld = local_now().date()
+    bonus_now = await period_progress(user["user_id"], ld.year, (ld.month - 1) // 2)
+    bonuses = await db.raffle_bonuses.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    prizes = await db.prizes.find({"user_id": user["user_id"]}, {"_id": 0}).sort("won_at", -1).to_list(50)
     return {"user": me_view(user), "today": today, "checked_in_today": bool(checkins and checkins[0]["date"] == today),
             "attendance": {"sessions": len(in_period), "since": start_date,
                            "door_value_cents": len(in_period) * CHECKIN_CENTS, "membership_cents": ANNUAL_CENTS},
             "recent_checkins": checkins[:8], "token": token, "month": month,
-            "raffle_numbers": [r["number"] for r in raffle], "raffle_entry_cents": RAFFLE_CENTS,
+            "raffle_entries": [{"number": r["number"], "source": r.get("source", "purchase")} for r in raffle],
+            "raffle_entry_cents": RAFFLE_CENTS, "bonus": {"current": bonus_now, "awarded": bonuses,
+                                                      "entries": BONUS_ENTRIES},
+            "prizes": prizes, "today_date": ld.isoformat(),
             "payments": [payment_view(p) for p in payments]}
 
 
@@ -488,7 +547,7 @@ class LogIn(BaseModel):
 
 
 @api.post("/logs")
-async def create_log(body: LogIn, user: dict = Depends(require_subscriber)):
+async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
     if body.genre not in GENRES:
         raise HTTPException(400, "Pick a genre from the list")
     if body.placement > body.player_count:
@@ -530,7 +589,7 @@ async def genres():
 
 
 @api.get("/leaderboards")
-async def leaderboards(game: Optional[str] = None, user: dict = Depends(require_subscriber)):
+async def leaderboards(game: Optional[str] = None, user: dict = Depends(get_current_user)):
     cutoff = (local_now().date() - timedelta(days=365)).isoformat()
     base_match = {"played_at": {"$gte": cutoff}}
     titles = await db.game_logs.aggregate([{"$match": base_match},
@@ -669,6 +728,101 @@ async def set_role(user_id: str, body: RoleIn, admin: dict = Depends(require_adm
         raise HTTPException(400, "Admin role can't be changed here")
     await db.users.update_one({"user_id": user_id}, {"$set": {"role": body.role}})
     return {"ok": True, "role": body.role}
+
+
+@api.post("/admin/users/{user_id}/grant-membership")
+async def grant_membership(user_id: str, admin: dict = Depends(require_admin)):
+    if not await db.users.find_one({"user_id": user_id}, {"_id": 1}):
+        raise HTTPException(404, "User not found")
+    p = {"checkout_id": f"cash_{uuid.uuid4().hex}", "user_id": user_id, "product": "annual",
+         "label": "Annual Membership (cash at door)", "amount_cents": ANNUAL_CENTS, "currency": "AUD",
+         "status": "COMPLETED", "method": "cash", "recorded_by": admin["name"], "meta": {},
+         "created_at": iso(now()), "paid_at": iso(now())}
+    await db.payments.insert_one(dict(p))
+    await fulfil(p)
+    return me_view(await db.users.find_one({"user_id": user_id}, {"_id": 0}))
+
+
+@api.get("/admin/sessions")
+async def session_summary(date: Optional[str] = None, staff: dict = Depends(require_staff)):
+    d = date or local_now().date().isoformat()
+    logs = await db.game_logs.find({"played_at": d}, {"_id": 0}).to_list(2000)
+    names = {u["user_id"]: u["name"] for u in await db.users.find(
+        {"user_id": {"$in": list({lg["user_id"] for lg in logs})}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(2000)}
+    games: dict = {}
+    for lg in logs:
+        g = games.setdefault(lg["title_key"], {"title": lg["title"], "genre": lg["genre"], "plays": 0,
+                                               "minutes": 0, "players": set(), "entries": []})
+        g["plays"] += 1
+        g["minutes"] += lg["playtime_min"]
+        g["players"].add(lg["user_id"])
+        g["entries"].append({"id": lg["id"], "name": names.get(lg["user_id"], "Player"), "player_id": lg["player_id"],
+                             "score": lg["score"], "placement": lg["placement"],
+                             "player_count": lg["player_count"], "playtime_min": lg["playtime_min"]})
+    out = []
+    for g in sorted(games.values(), key=lambda x: -x["plays"]):
+        g["entries"].sort(key=lambda e: (e["placement"], -e["score"]))
+        out.append(g | {"players": len(g["players"])})
+    recent = sorted(set(await db.checkins.distinct("date")) | set(await db.game_logs.distinct("played_at")),
+                    reverse=True)[:30]
+    return {"date": d, "attendees": await db.checkins.count_documents({"date": d}), "logs": len(logs),
+            "loggers": len({lg["user_id"] for lg in logs}), "games": out, "recent_dates": recent}
+
+
+class PrizeIn(BaseModel):
+    user_id: str
+    prize: str = Field(min_length=1, max_length=120)
+    event: str = Field(default="", max_length=120)
+    won_at: Optional[str] = None
+
+
+@api.post("/admin/prizes")
+async def add_prize(body: PrizeIn, staff: dict = Depends(require_staff)):
+    u = await db.users.find_one({"user_id": body.user_id}, {"_id": 0})
+    if not u:
+        raise HTTPException(404, "User not found")
+    try:
+        won = Date.fromisoformat(body.won_at) if body.won_at else local_now().date()
+    except ValueError:
+        raise HTTPException(400, "Invalid date")
+    doc = {"id": uuid.uuid4().hex, "user_id": body.user_id, "user_name": u["name"], "prize": body.prize.strip(),
+           "event": body.event.strip(), "won_at": won.isoformat(),
+           "collect_by": (won + relativedelta(months=3)).isoformat(), "collected": False,
+           "recorded_by": staff["name"], "created_at": iso(now())}
+    await db.prizes.insert_one(dict(doc))
+    return doc
+
+
+@api.get("/admin/prizes")
+async def list_prizes(staff: dict = Depends(require_staff)):
+    return await db.prizes.find({}, {"_id": 0}).sort([("collected", 1), ("collect_by", 1)]).to_list(500)
+
+
+@api.post("/admin/prizes/{prize_id}/collected")
+async def collect_prize(prize_id: str, staff: dict = Depends(require_staff)):
+    r = await db.prizes.update_one({"id": prize_id}, {"$set": {"collected": True, "collected_at": iso(now()),
+                                                             "handed_over_by": staff["name"]}})
+    if not r.matched_count:
+        raise HTTPException(404, "Prize not found")
+    return {"ok": True}
+
+
+@api.get("/stats/monthly")
+async def monthly_top_games(user: dict = Depends(get_current_user)):
+    ld = local_now().date()
+    cutoff = (Date(ld.year, ld.month, 1) - relativedelta(months=11)).isoformat()
+    rows = await db.game_logs.aggregate([
+        {"$match": {"played_at": {"$gte": cutoff}}},
+        {"$group": {"_id": {"m": {"$substrBytes": ["$played_at", 0, 7]}, "t": "$title_key"},
+                    "title": {"$first": "$title"}, "plays": {"$sum": 1}, "players": {"$addToSet": "$user_id"},
+                    "minutes": {"$sum": "$playtime_min"}}}]).to_list(5000)
+    months: dict = {}
+    for r in rows:
+        months.setdefault(r["_id"]["m"], []).append({"title": r["title"], "plays": r["plays"],
+                                                     "players": len(r["players"]), "minutes": r["minutes"]})
+    return [{"month": m, "total_plays": sum(g["plays"] for g in gs), "distinct_games": len(gs),
+             "top": sorted(gs, key=lambda g: (-g["plays"], -g["players"]))[:5]}
+            for m, gs in sorted(months.items(), reverse=True)]
 
 
 @api.get("/")
