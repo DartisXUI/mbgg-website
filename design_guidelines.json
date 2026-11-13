@@ -1,0 +1,146 @@
+{
+  "project_title": "Murray Bridge Games Group - PWA Community & Membership Platform",
+  "design_archetype": "Neon Arcade & Tactical Club (Red/Blue Dual-Glow with Orange Energy Highlights)",
+  "theme_strategy": {
+    "default_mode": "dark",
+    "background": "Deep Void (#0B0F19)",
+    "surface": "Obsidian Surface (#121826)",
+    "card_bg": "#1A2234",
+    "primary_red": "#FF3B5C",
+    "primary_blue": "#00E5FF",
+    "accent_orange": "#FF8C00",
+    "border_glow": "1px solid rgba(255, 59, 92, 0.2)"
+  },
+  "brand_assets": {
+    "widescreen_logo": "/brand/wide.png",
+    "widescreen_usage": "Featured prominently at the top of every page header/navigation (neon night-scene banner with red-left, blue-right painted border)",
+    "round_logo": "/brand/round.png",
+    "round_usage": "Used in mobile top bar badge, profile avatars default, favicon, footer, check-in dialog, and compact headers",
+    "soloverse_logo": "/brand/soloverse.png",
+    "soloverse_usage": "Featured game tile with rainbow hexagon logo badge"
+  },
+  "favourite_games_rail": {
+    "games": [
+      "Flip 7", "Love Letter", "Tacta", "Star Realms", "Shards of Infinity", 
+      "Project L", "Dominion", "Nexus Ops", "King of Tokyo", "Soloverse", 
+      "Castles of Caleira", "Ticket to Ride", "Catan", "Stardew Valley", 
+      "Survive the Island", "Jackbox Party Packs", "12 Rivers", "Splendor", 
+      "Brawlhalla", "Mario Kart"
+    ],
+    "desktop_behavior": "Fixed side rails on left and right margins that stay stationary during vertical scroll. Randomizes order/featured set on every page load.",
+    "mobile_behavior": "Horizontal scrolling marquee / ribbon ticker at top/bottom of content or collapsible drawer to preserve touch screen real estate.",
+    "tile_style": "Stylised typographic & iconic badges with custom neon borders, glowing genre chips, hover scale, and Soloverse rainbow hexagon emblem."
+  },
+  "typography": {
+    "heading_font": "Barlow Condensed, Outfit, sans-serif",
+    "body_font": "Inter, DM Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight uppercase",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed text-slate-300",
+      "caption": "text-xs uppercase tracking-widest text-slate-400 font-mono"
+    }
+  },
+  "color_palette": {
+    "background": "#0B0F19",
+    "surface": "#121826",
+    "surface_hover": "#1C253B",
+    "primary_red": "#FF3B5C",
+    "primary_blue": "#00E5FF",
+    "accent_orange": "#FF8C00",
+    "text_main": "#F8FAFC",
+    "text_muted": "#94A3B8",
+    "border_muted": "rgba(255, 255, 255, 0.1)",
+    "glow_red": "0 0 20px rgba(255, 59, 92, 0.35)",
+    "glow_blue": "0 0 20px rgba(0, 229, 255, 0.35)",
+    "glow_orange": "0 0 15px rgba(255, 140, 0, 0.4)"
+  },
+  "image_urls": {
+    "board_game_session_1": "https://images.unsplash.com/photo-1781583771826-0d37bd8bf7f6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxib2FyZCUyMGdhbWUlMjBzZXNzaW9uJTIwc29jaWFsJTIwZ2FtaW5nJTIwZ2FtaW5nfGVufDB8fHx8MTc5NDU4MDE2Mnww&ixlib=rb-4.1.0&q=85",
+    "board_game_cards_2": "https://images.unsplash.com/photo-1703000970463-bd63dbe98e15?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHw0fHx0YWJsZXRvcCUyMGNhcmRzJTIwZ2FtaW5nJTIwY2x1YiUyMGZyaWVuZHN8ZW58MHx8fHwxNzk0NTgwMTYyfDA&ixlib=rb-4.1.0&q=85",
+    "monopoly_session_3": "https://images.unsplash.com/photo-1677188010559-0667a1ed33a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwxfHx0YWJsZXRvcCUyMGNhcmRzJTIwZ2FtaW5nJTIwY2x1YiUyMGZyaWVuZHN8ZW58MHx8fHwxNzk0NTgwMTYyfDA&ixlib=rb-4.1.0&q=85"
+  },
+  "layout_and_grid": {
+    "container_max_width": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "side_rail_padding": "lg:pl-32 lg:pr-32",
+    "bento_grid_marketing": "grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-6 md:gap-8",
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+    "spacing_philosophy": "Generous vertical rhythm with py-16 to py-24 between major landing sections and p-6 on internal containers"
+  },
+  "key_features_and_flows": {
+    "landing_hero_and_membership_offer": {
+      "headline": "Murray Bridge Games Group",
+      "subtitle": "Board games, card games, computer games & community in SA",
+      "annual_sub_offer": "$120 AUD / Year (Save $50 AUD vs $170/yr standard $5 door fee). Disclaimer: No further discount if sessions missed.",
+      "benefits": [
+        "Free drink & snack during free admission sessions",
+        "1 guaranteed game choice per month (host notification token)",
+        "3-month raffle prize holding window without requiring attendance",
+        "Self-reported game log access & 365-day leaderboards"
+      ],
+      "square_checkout_cta": "Subscribe for $120 AUD / Year (Square Checkout)"
+    },
+    "digital_checkin_and_pay": {
+      "admission_fee": "$5 AUD single session check-in auto-paid via Square or free for active $120/yr subscribers",
+      "attendance_tracker": "Option to check in digitally on website/PWA to log total sessions attended vs subscription savings"
+    },
+    "monthly_game_choice_token": {
+      "function": "Subscribers get 1 token per month to select guaranteed table/computer game.",
+      "host_alert": "Triggers host notification alert in Admin Panel with user ID & chosen game name."
+    },
+    "honor_system_game_log": {
+      "access": "Subscribers only (honor-based self reporting)",
+      "fields": ["Game Title", "Genre", "Player Count", "Own Player ID", "Estimated Playtime (mins)", "Total Score", "Endgame Placement"],
+      "tabs": "Separate tab per game with filtered game log tables"
+    },
+    "leaderboards_365_days": {
+      "timeframe": "Last 365 Days rolling statistics",
+      "metrics": ["Total Score", "Placements", "Win Rate %", "Playtime (Hours)", "Total Sessions"]
+    },
+    "raffle_and_donations": {
+      "raffle": "Buy lucky-number raffle entries for end-of-year free session celebration",
+      "donations": "Preset tiers: $5, $10, $20, $50, or custom AUD donation via Square"
+    },
+    "public_profiles": {
+      "collection_tabs": ["Board Games", "Card Games", "Digital Platforms (Steam/Switch/PC)"],
+      "user_stats_summary": "Total games logged, favorite game, subscriber badge"
+    },
+    "admin_host_dashboard": {
+      "features": [
+        "View incoming game choice token alerts with chosen game & timestamp",
+        "Live session digital check-in roster",
+        "User management & host promotion privileges"
+      ]
+    }
+  },
+  "component_guidelines": {
+    "interactive_elements": "Must use custom Tailwind styling with high contrast text and hover glows",
+    "toasts": "Use sonner for notifications (e.g., token spent, check-in confirmed, game logged)",
+    "pwa_compatibility": "Service worker manifest, add-to-homescreen prompt, touch-optimized hit areas (min 44px)"
+  },
+  "testing_and_data_attributes": {
+    "rule": "ALL interactive and key informational elements MUST include kebab-case data-testid attributes",
+    "examples": [
+      "data-testid=\"widescreen-logo-header\"",
+      "data-testid=\"subscribe-annual-button\"",
+      "data-testid=\"checkin-pay-button\"",
+      "data-testid=\"game-choice-token-alert\"",
+      "data-testid=\"game-log-tab-boardgames\"",
+      "data-testid=\"leaderboard-win-rate-tab\"",
+      "data-testid=\"raffle-buy-entry-button\"",
+      "data-testid=\"admin-promote-host-button\""
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure Javascript React (.js) files are used with Tailwind CSS and standard Lucide / Radix icons.",
+    "Feature widescreen logo /brand/wide.png at top header across pages with red-left blue-right neon border theme.",
+    "Feature round logo /brand/round.png for mobile badges, user avatars, dialogs, and footers.",
+    "Implement fixed side game rails featuring random mixes from the 20 favourite games on each page load.",
+    "Support Square hosted checkout flows or mock Square payment dialogs with clear AUD pricing.",
+    "Maintain strict high-contrast dark theme with red (#FF3B5C), blue (#00E5FF), and orange (#FF8C00) accents.",
+    "Attach data-testid to every button, tab, input, and critical metric for automated verification."
+  ]
+}

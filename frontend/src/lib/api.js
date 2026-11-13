@@ -1,0 +1,24 @@
+import axios from "axios";
+import { toast } from "sonner";
+
+export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+export const http = axios.create({ baseURL: API, withCredentials: true });
+
+export const errMsg = (e) => {
+  const d = e?.response?.data?.detail;
+  if (Array.isArray(d)) return d.map((x) => x.msg).join(", ");
+  return d || e?.message || "Something went wrong";
+};
+
+export const money = (cents) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+
+export async function startCheckout(product, extra = {}) {
+  try {
+    const { data } = await http.post("/payments/checkout", { product, ...extra });
+    window.location.assign(data.checkout_url);
+    return true;
+  } catch (e) {
+    toast.error(errMsg(e));
+    return false;
+  }
+}
