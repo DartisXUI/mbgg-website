@@ -11,6 +11,11 @@ export const errMsg = (e) => {
 };
 
 export const adelaideToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Adelaide" });
+// evening sessions run past midnight: before 5am counts as the previous day's session
+export const sessionDate = () => {
+  const hour = Number(new Date().toLocaleString("en-AU", { timeZone: "Australia/Adelaide", hour: "numeric", hourCycle: "h23" }));
+  return hour < 5 ? new Date(Date.now() - 6 * 3600 * 1000).toLocaleDateString("en-CA", { timeZone: "Australia/Adelaide" }) : adelaideToday();
+};
 export const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export const money = (cents) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;

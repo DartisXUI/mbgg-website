@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { http, errMsg, adelaideToday } from "@/lib/api";
+import { http, errMsg, adelaideToday, sessionDate } from "@/lib/api";
 import { FAVOURITE_GAMES } from "@/data/games";
 
 const today = adelaideToday;
@@ -18,7 +18,7 @@ const F = ({ id, label, children }) => (
 );
 
 export const LogGameDialog = ({ genres, titles, playerTag, onSaved }) => {
-  const blank = { title: "", genre: "", player_count: 4, player_id: playerTag || "", playtime_min: 30, score: 0, placement: 1, played_at: today() };
+  const blank = { title: "", genre: "", player_count: 4, player_id: playerTag || "", playtime_min: 30, score: 0, placement: 1, played_at: sessionDate() };
   const [open, setOpen] = useState(false);
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);

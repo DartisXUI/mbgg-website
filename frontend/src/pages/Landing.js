@@ -5,7 +5,7 @@ import { startCheckout } from "@/lib/api";
 
 const PERKS = [
   { icon: CalendarCheck, title: "Check in free", text: "Everyone checks in on the site or app. Members are not required to pay the admission while subscribed, and can track attendance against what they paid." },
-  { icon: Coffee, title: "Free drink & snack", text: "A free drink and snack (hot, cold or otherwise) during free admission sessions." },
+  { icon: Coffee, title: "Free drink & snack", text: "A free drink and snack (hot, cold or otherwise) during special member-wide free admission sessions." },
   { icon: Crown, title: "Guaranteed game choice", text: "1 x guaranteed game pick every month. Tap your token and the hosts are alerted." },
   { icon: Gift, title: "Win without being there", text: "Raffle prizes are held for you until collection, for up to 3 months." },
   { icon: Award, title: "Quarterly score prize", text: "The subscriber with the top total score at the end of March, June, September and December wins a free prize." },

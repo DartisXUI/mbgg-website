@@ -3,7 +3,7 @@ import { BadgeCheck, Check, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { http, errMsg, adelaideToday } from "@/lib/api";
+import { http, errMsg, plural } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { GrantMembershipButton, PrizeTracker, SessionSummary } from "@/components/AdminExtras";
 import { markCheckinsSeen } from "@/components/HeaderWidgets";
@@ -65,7 +65,7 @@ const CheckinRoster = () => {
         {data && Object.entries(data.session_labels).map(([key, label]) => (
           <div key={key} data-testid={`admin-checkin-session-${key}`}>
             <div className="flex justify-between bg-white/[0.03] px-5 py-2 text-xs uppercase tracking-widest text-slate-400">
-              <span>{label}</span><span data-testid={`admin-checkin-session-count-${key}`}>{data.session_headcount[key]} people</span>
+              <span>{label}</span><span data-testid={`admin-checkin-session-count-${key}`}>{plural(data.session_headcount[key], "person").replace("persons", "people")}</span>
             </div>
             {data.rows.filter((r) => r.session === key).map((r) => (
               <div key={r.id} data-testid={`admin-checkin-row-${r.user_id}-${key}`} className="flex items-center gap-3 border-b border-white/5 px-5 py-3">

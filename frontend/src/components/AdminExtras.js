@@ -3,13 +3,13 @@ import { Check, Gift, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { http, errMsg, adelaideToday, plural } from "@/lib/api";
+import { http, errMsg, adelaideToday, plural, sessionDate } from "@/lib/api";
 
 const ord = (n) => `${n}${["th", "st", "nd", "rd"][(n % 100 >> 3) ^ 1 && n % 10] || "th"}`;
 const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
 export const SessionSummary = () => {
-  const [date, setDate] = useState(adelaideToday());
+  const [date, setDate] = useState(sessionDate());
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {

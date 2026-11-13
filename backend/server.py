@@ -550,7 +550,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
 
 async def unlogged_checkins(user_id: str) -> list[str]:
     today = local_now().date()
-    rng = {"$gte": (today - timedelta(days=14)).isoformat(), "$lt": today.isoformat()}
+    rng = {"$gte": (today - timedelta(days=14)).isoformat(), "$lt": current_slot()[0]}
     dates = list({c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
                                                             {"_id": 0, "date": 1}).to_list(50)})
     logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": {"$in": dates}}))
@@ -668,7 +668,7 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
     if body.placement > body.player_count:
         raise HTTPException(400, "Placement can't be higher than the player count")
     today = local_now().date()
-    played = body.played_at or today.isoformat()
+    played = body.played_at or current_slot()[0]
     try:
         pd = datetime.fromisoformat(played).date()
     except ValueError:
@@ -868,7 +868,7 @@ async def admin_summary(since: Optional[str] = None, user: dict = Depends(requir
                 "session": r.get("session", "day"),
                 "family_count": len(r.get("family", [])), "created_at": r["created_at"]} for r in rows]
     return {"unacked_tokens": await db.token_uses.count_documents({"acknowledged": False}),
-            "checkins_today": await db.checkins.count_documents({"date": today}),
+            "checkins_today": await db.checkins.count_documents({"date": current_slot()[0]}),
             "latest_checkin_at": latest["created_at"] if latest else None, "new_checkins": new}
 
 
@@ -936,7 +936,7 @@ async def grant_membership(user_id: str, admin: dict = Depends(require_admin)):
 
 @api.get("/admin/sessions")
 async def session_summary(date: Optional[str] = None, staff: dict = Depends(require_staff)):
-    d = date or local_now().date().isoformat()
+    d = date or current_slot()[0]
     try:
         Date.fromisoformat(d)
     except ValueError:

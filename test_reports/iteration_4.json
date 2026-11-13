@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 4 tested the per-session check-ins on backend and frontend. Testing ran at 02:30 Saturday 14 Nov 2026 Adelaide time, so current_slot was ('2026-11-13', 'evening'), which is the after-midnight case. New suite tests/test_iteration4_sessions.py has 15 tests: 12 pass, 3 fail. With the older suites (quarterly test deselected) 61 tests ran and 57 passed. All 4 failures come from one root cause: some endpoints still use the calendar date instead of the current session's date. All the requested core behaviour works: session key/label; second_session_free; via=paid_earlier; checkout returns 400 when the second session is free; a paid_earlier check-in does not make another session free; a paid check-in on another date gives 402; checkout meta.session is set; 400 'already checked in for this session'; another session does not block the current one; door value counts each date once while sessions counts check-ins; family check-in attaches only to the current session's check-in; admin roster grouped by session with per-session headcounts and the default date set to the session date; summary new_checkins includes session; bonus progress and reminders de-duplicate dates. UI: landing perk texts are correct and no '1 x drink' text remains. A non-subscriber who paid for the day session sees 'Check in free' and the evening-free note, checks in, and history shows '4pm–late · Free (paid earlier)' and '10am–2pm · Paid $5'. A subscriber with kid Mia sees 'A free drink and snack included · With Mia'. A plain non-subscriber at 390px sees 'Check in & pay $5' and is sent to square.link, which was blocked, so the payment stayed PENDING with meta.session='evening'. Staff toast reads 'TEST hostc checked in · 4pm–late'. Admin roster shows Day 1 person and Evening 4 people, with the label 'Free · paid earlier today'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/admin/summary", "issue": "checkins_today counts {date: local calendar date}. Between 00:00 and 04:59 the evening session belongs to the previous date, so the count is 0 while people are checked in. Seen: 0 vs 2. Use current_slot()[0]."},
+      {"endpoint": "GET /api/admin/sessions", "issue": "The default date is local_now().date() rather than the session date. After midnight the Session summary tab opens on an empty next day. attendees also counts each check-in row, so someone at both sessions counts as 2 (likely intended, but confirm)."},
+      {"endpoint": "POST /api/logs (played_at default) + unlogged_checkins/reminders", "issue": "A game logged after midnight during the evening session (no played_at) is stored with played_at = the calendar day (2026-11-14), not the session date (2026-11-13). The check-in stays 'unlogged', the reminder banner keeps showing, and the log-every-session raffle bonus can be lost. unlogged_checkins also uses '$lt today', so after midnight the reminder banner shows for the evening session that is still running. Use the session date (current_slot) as the default played_at and as the cutoff for reminders, and check the frontend Game Log date default too."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CheckInPanel (checkIn success toast)", "issue": "A non-host whose second session is free (paid_earlier) gets the toast 'Checked in with free host admission'. It should be something like 'Checked in free – you paid for the day session'.", "selector": "[data-sonner-toast]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Reminder banner after midnight", "issue": "Shows 'You checked in on Fri, 13 Nov but haven't logged a game' during the still-running evening session (backend root cause above).", "affected_selectors": ["reminder banner"]}
+    ],
+    "design_issues": [
+      {"screen": "Admin Check-ins", "issues": ["admin-checkin-session-count shows '1 PEOPLE'. It should be singular ('1 person').", "The date filter is a native <input type=date> (browser default picker), not the shadcn Calendar."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration4_sessions.py", "/app/backend/tests/ui_seed_iter4.py", "/app/test_reports/pytest/iter4.xml"],
+  "action_items": [
+    "Use the session date (current_slot()[0]) for admin_summary.checkins_today and as the default date for /admin/sessions",
+    "POST /api/logs: default played_at to the session date (current_slot()[0]); also allow that date when it is 'yesterday' after midnight. Update the frontend Game Log default date to match",
+    "unlogged_checkins: exclude the current session date, not just the calendar today",
+    "CheckInPanel: correct the success toast for second_session_free (non-host) users",
+    "Admin roster: pluralise 'people' correctly"
+  ],
+  "critical_code_review_comments": [
+    "The midnight rollover is handled in current_slot, but other time-based code paths (admin_summary, session_summary, create_log, unlogged_checkins) still use local_now().date(), so they disagree with the check-in date from 00:00 to 04:59.",
+    "paid_earlier keys off via='paid' for the date regardless of session. This is fine for a two-session day and a paid_earlier row does not chain (verified).",
+    "Earlier tests in test_mbgg_api.py and test_iteration3_features.py assumed the check-in date is the calendar date. They were updated to use the session date (test files only)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration4_sessions.py", "/app/backend/tests/ui_seed_iter4.py", "/app/backend/tests/test_mbgg_api.py", "/app/backend/tests/test_iteration3_features.py"],
+  "success_rate": {"backend": "93% (57/61 tests, 4 failures from 1 root cause)", "frontend": "95% (all flows work; 1 wrong toast message)"},
+  "test_credentials": "Admin alcock.jacob@gmail.com / MBGG-Host-Admin-2026 worked",
+  "seed_data_creation": "Only TEST_ users and their check-ins, payments and sessions were created, and all were removed, along with login_attempts for TEST_ emails. Pending Square links were deleted through the fixture cleanup and nothing was paid. quarter_awards was not touched; the quarterly test was deselected.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/ -n 0 --deselect tests/test_iteration3_features.py::TestQuarterly. The quarterly test deletes all quarter_awards, so avoid it. test_iteration4_sessions computes SLOT_DATE/SLOT/OTHER itself and inserts other-session check-ins in Mongo. The 3 'after-midnight' tests only fail between 00:00 and 04:59 Adelaide time and pass at other hours, so rerun them then or after the fix. For the UI: python3 tests/ui_fixtures.py setup && python3 tests/ui_seed_iter4.py (nonsub gets a 'paid' check-in for the other session; hostc becomes host). Clean up with ui_fixtures.py cleanup. Block **/*square*/** in Playwright and use an async route handler (a lambda with a tuple raised an error). Login inputs are login-email-input, login-password-input and login-submit-button.",
+  "rca of the issue": "Root cause: local_now().date() is used instead of current_slot()[0] in admin_summary (line ~859), session_summary (~938), create_log (~670) and unlogged_checkins (~552). To reproduce, between 00:00 and 04:59 Adelaide time check in (date = yesterday) and then GET /api/admin/summary (checkins_today = 0); or POST /api/logs without played_at (played_at = today) and the reminder for yesterday stays. Fix: route these through the session date."
+}

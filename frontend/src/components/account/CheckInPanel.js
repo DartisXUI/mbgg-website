@@ -45,7 +45,7 @@ export const CheckInCard = ({ data, reload }) => {
       if (!(await startCheckout("checkin", { family_ids: picked }))) setBusy(false);
       return;
     }
-    run(() => http.post("/checkin", { family_ids: picked }), u.is_subscriber ? "Checked in! Grab your free drink & snack." : "Checked in with free host admission");
+    run(() => http.post("/checkin", { family_ids: picked }), u.is_subscriber ? "Checked in! Grab your free drink & snack." : data.free_entry ? "Checked in with free host admission" : "Checked in free – you already paid today");
   };
   const addKids = () => run(() => http.post("/checkin/family", { family_ids: picked }), "Family checked in free");
   const note = u.is_subscriber ? "Members are not required to pay the admission while subscribed, plus a free drink and snack." : data.free_entry ? "Hosts & admins get free admission." : data.second_session_free ? "You paid for the day session, so this evening session is free." : `Tap to pay the ${money(500)} admission and you're on the list. Paying for the day session makes the evening session free.`;

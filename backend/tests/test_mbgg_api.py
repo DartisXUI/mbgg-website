@@ -111,7 +111,7 @@ class TestSubscriberCheckinToken:
         s, u, _ = register_user("subci", subscriber=True, domain="gmail.com")
         assert s.get(f"{BASE_URL}/api/auth/me").json()["is_subscriber"] is True
         r = s.post(f"{BASE_URL}/api/checkin")
-        assert r.status_code == 200 and r.json()["date"] == today().isoformat()
+        assert r.status_code == 200 and r.json()["date"] == __import__("test_iteration4_sessions").SLOT_DATE
         assert s.post(f"{BASE_URL}/api/checkin").status_code == 400
         d = s.get(f"{BASE_URL}/api/me/dashboard").json()
         assert d["checked_in_today"] is True

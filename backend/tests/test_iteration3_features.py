@@ -61,7 +61,7 @@ class TestCheckinFamily:
         assert r.status_code == 400 and "first" in r.json()["detail"].lower()
         r = s.post(f"{BASE_URL}/api/checkin", json={"family_ids": [k1["id"]]})
         assert r.status_code == 200, r.text
-        row = mdb.checkins.find_one({"user_id": u["user_id"], "date": TODAY.isoformat()})
+        row = mdb.checkins.find_one({"user_id": u["user_id"], "date": __import__("test_iteration4_sessions").SLOT_DATE})
         assert row["via"] == "subscription" and [f["name"] for f in row["family"]] == ["Alice"]
         dash = s.get(f"{BASE_URL}/api/me/dashboard").json()
         assert dash["checked_in_today"] and dash["free_entry"] and len(dash["today_checkin"]["family"]) == 1
@@ -83,7 +83,7 @@ class TestCheckinFamily:
         assert n and n[0]["family_count"] == 2 and n[0]["via"] == "subscription"  # current family count
         assert summ["checkins_today"] >= 1 and summ["latest_checkin_at"]
         # session summary attendees includes kids
-        sess = admin_client.get(f"{BASE_URL}/api/admin/sessions").json()
+        sess = admin_client.get(f"{BASE_URL}/api/admin/sessions", params={"date": ac["date"]}).json()
         assert sess["attendees"] == ac["headcount"]
 
     def test_15plus_family_rejected_on_checkin(self):
@@ -102,7 +102,7 @@ class TestCheckinFamily:
         kid = s.post(f"{BASE_URL}/api/me/family", json={"name": "HostKid", "birth_year": YEAR - 2}).json()
         r = s.post(f"{BASE_URL}/api/checkin", json={"family_ids": [kid["id"]]})
         assert r.status_code == 200, r.text
-        row = mdb.checkins.find_one({"user_id": u["user_id"], "date": TODAY.isoformat()})
+        row = mdb.checkins.find_one({"user_id": u["user_id"], "date": __import__("test_iteration4_sessions").SLOT_DATE})
         assert row["via"] == "staff" and len(row["family"]) == 1
         assert s.get(f"{BASE_URL}/api/me/dashboard").json()["free_entry"] is True
 
