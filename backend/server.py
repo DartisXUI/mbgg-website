@@ -546,6 +546,8 @@ class FamilyIn(BaseModel):
 
 @api.post("/me/family")
 async def add_family(body: FamilyIn, user: dict = Depends(get_current_user)):
+    if not body.name.strip():
+        raise HTTPException(400, "Enter a name")
     if not 0 <= local_now().year - body.birth_year <= 14:
         raise HTTPException(400, "Family members listed here must be under 15")
     if len(user.get("family", [])) >= 10:
@@ -729,10 +731,12 @@ async def award_quarter_prizes() -> None:
     for year in (today.year - 1, today.year):
         for q in range(1, 5):
             end = quarter_end(year, q)
-            if end >= today or await db.quarter_awards.find_one({"year": year, "quarter": q}, {"_id": 1}):
+            if end + timedelta(days=7) >= today or await db.quarter_awards.find_one({"year": year, "quarter": q}, {"_id": 1}):
                 continue
             standings = await ytd_standings(year, end)
             w = standings[0] if standings else None
+            if not w:
+                continue
             try:
                 await db.quarter_awards.insert_one({
                     "id": uuid.uuid4().hex, "year": year, "quarter": q, "label": f"Q{q} {year}", "end": end.isoformat(),
@@ -827,7 +831,8 @@ async def admin_summary(since: Optional[str] = None, user: dict = Depends(requir
     latest = await db.checkins.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
     new = []
     if since:
-        rows = await db.checkins.find({"created_at": {"$gt": since}}, {"_id": 0}).sort("created_at", 1).to_list(50)
+        rows = await db.checkins.find({"created_at": {"$gt": since}, "user_id": {"$ne": user["user_id"]}},
+                                      {"_id": 0}).sort("created_at", 1).to_list(50)
         names = {u["user_id"]: u["name"] for u in await db.users.find(
             {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(50)}
         new = [{"id": r["id"], "name": names.get(r["user_id"], "Someone"), "via": r["via"],

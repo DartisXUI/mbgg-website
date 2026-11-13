@@ -22,6 +22,10 @@ Choices: Square (AUD), Google + email/password login (no Facebook), one admin wh
 - User request: cash membership button (admin), prize pickup tracker (3 months), game log + leaderboards open to every account, 3 free raffle entries for logging every checked-in session in a 2-month block, site name colours (Murray white / Bridge logo blue #12a4f5 / Games Group white), host session summary of games & scores, monthly most-played games.
 - Implemented all; tested iteration_2 (backend 36/36, UI flows pass). Follow-up fixes: bonus backfill of previous-year blocks (late awards go into current year raffle), date validation, prize collect guard, grant button double-click guard, error states.
 
+## Iteration 3 (2026-11-13)
+- Install-to-home-screen button (native prompt or instructions dialog); staff toast + badge alerts on new digital check-ins; family members under 15 (name + birth year) on accounts, checked in free with parent (counted in headcount, no login); hosts/admins free check-in; side rails removed, ticker directly under logo; perks "no manual admission"/"optional check-in" removed (everyone checks in, members free); quarterly (Mar/Jun/Sep/Dec) top total-score-since-1-Jan subscriber prize auto-recorded into prize tracker 7 days after quarter end; reminder banner for past check-ins (last 14 days) without a game log.
+- Tested iteration_3: backend 49/49, frontend flows pass. Follow-ups: own check-in excluded from staff alerts, blank family names rejected, quarter winners decided after 7-day grace and never frozen empty.
+
 ## Backlog
 - P1: Square webhook for payments where user never returns; admin manual "paid cash"/grant membership; prize holding tracker (3-month window)
 - P2: push notifications to hosts for token alerts; shadcn date picker; raffle draw tool

@@ -41,7 +41,7 @@ export const FamilyCard = ({ data, reload }) => {
       </ul>
       <form onSubmit={add} className="mt-4 flex flex-col gap-2 sm:flex-row">
         <Input data-testid="family-name-input" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="h-11 bg-[#0B0F19]" />
-        <Input data-testid="family-birth-year-input" required type="number" min={thisYear - 14} max={thisYear} value={year} onChange={(e) => setYear(e.target.value)} placeholder="Birth year" className="h-11 bg-[#0B0F19] sm:w-32" />
+        <Input data-testid="family-birth-year-input" required type="number" min={thisYear - 14} max={thisYear} value={year} onChange={(e) => setYear(e.target.value)} placeholder="Birth year" className="h-11 bg-[#0B0F19] sm:w-40" />
         <button data-testid="family-add-button" className="btn-blue shrink-0">Add</button>
       </form>
     </div>

@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 3 tested end to end, backend and frontend. Backend: new suite test_iteration3_features.py (13 tests) plus the earlier suites, 49/49 pass (run with -n 0). Covered: family CRUD and age rule (14 accepted, 15+ and future years 400, max 10, 404 on unknown delete), subscriber and host free check-in with kids, /checkin/family (400 without own check-in, de-dupes, 400 on unknown or empty ids), 15+ family member rejected at check-in, non-subscriber 402 on /checkin, and the Square checkout carrying meta.family (pending link reused, never paid). Also: checkout returns 400 for host and admin, admin summary new_checkins and family_count, headcount includes kids, session attendees include kids, and the quarterly auto-award (Q1/Q2/Q3 2026 winners, one Q3 prize with collect_by 2027-01-01, idempotent, non-subscriber excluded). Reminders: past check-in within 14 days shows, older than 14 days and today don't, logging a game clears it. Regression: cash grant, token, logs, leaderboards, prizes. Frontend: install button and dialog at 1920 and 390; no side rails; ticker under the logo and nav at both sizes, no horizontal overflow; perks updated. FamilyCard add and delete, with native validation blocking 15+. Subscriber check-in with Mia, then Leo added later. Host free check-in. Staff toast 'TEST subb checked in' about 20s after another user checked in through the API, badge went to 1 and cleared on opening the Check-ins tab. Roster shows 5 people / 3 check-ins with family names and via labels. Session summary checked-in count is 5. Reminder banner shows on /account, /leaderboards and /members, Log now goes to /games, logging for that date removes it, and dismiss hides it across navigation. Quarterly section renders. Non-subscriber check-in sends family_ids and redirects to square.link, which was blocked so nothing was paid.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/summary?since=", "issue": "Kids added later via /api/checkin/family don't create a new alert (the check-in's created_at doesn't change). family_count shows the current total, not the count at check-in. The staff user's own check-in is not excluded, so a host can get a toast and badge count for their own check-in."},
+      {"endpoint": "/api/me/family", "issue": "A whitespace-only name passes min_length=1 and is stored as an empty string after strip(). Validate after stripping."},
+      {"endpoint": "/api/leaderboards/quarterly", "issue": "By design, a quarter is frozen when it is first evaluated. Games backdated afterwards (allowed up to 365 days) never count toward that quarter's award. Also, the award runs inside a GET by any user. That works, but a first call with no data at go-live permanently records winner=null."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/account FamilyCard", "issues": ["Birth year input (sm:w-32) cuts the placeholder off as 'Birth ye'. Widen it to about w-36 or use the placeholder 'Year'."]},
+      {"screen": "/admin Check-ins and /games log dialog", "issues": ["Date fields use the browser's native date picker instead of the shadcn Calendar/Popover (existing pattern)."]},
+      {"screen": "Header ticker", "issues": ["The ticker sits below the nav bar, not directly under the widescreen logo (logo, then nav, then ticker). This is probably acceptable. Ticker tiles have empty space in their lower half."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration3_features.py", "/app/backend/tests/ui_seed_iter3.py", "/app/test_reports/pytest/pytest_iter3.xml"],
+  "action_items": [
+    "Optional: exclude the requesting staff user's own check-in from new_checkins, and consider alerting when kids are added later",
+    "Optional: strip and validate family names server-side (reject blank)",
+    "Optional: widen the birth-year input"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1033 lines (over 700). Split it into routers: auth, payments, checkin/family, leaderboards/quarterly, admin.",
+    "useStaffAlerts compares the client clock ISO string ('...Z') with the server '+00:00' ISO strings. This works lexically, but client clock skew can miss or duplicate alerts. Consider using the server's latest_checkin_at as the 'seen' marker.",
+    "The CheckInPanel under15 check uses the browser's year and the server uses Adelaide's year. Around New Year's Eve the UI can show a kid the server rejects (harmless 400 toast)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration3_features.py", "/app/backend/tests/ui_seed_iter3.py"],
+  "success_rate": {"backend": "100% (49/49)", "frontend": "100% of tested flows"},
+  "seed_data_creation": "TEST_ users only (pytest and ui_fixtures.py). All TEST_ users and their checkins, game_logs, payments (pending Square links deleted), prizes, sessions and login_attempts were removed. The whole quarter_awards collection was deleted after testing, as instructed. The admin account was not modified (no admin check-in was created).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/ -n 0 (TestCheckinFamily asserts headcount == session attendees, so run serially). The quarterly test deletes all quarter_awards first; delete the collection again afterwards, because any visit to /leaderboards re-creates frozen null-winner docs. UI: python3 tests/ui_fixtures.py setup && python3 tests/ui_seed_iter3.py (host role, kids Mia/Leo for suba and Zoe for nonsub, past unlogged check-in for subb), then cleanup with ui_fixtures.py cleanup. Login redirects to /account, so navigate with an absolute base URL. Square is LIVE: block **/*square*/** in Playwright. The staff toast arrives within 20s (polling interval). Date during testing: 2026-11-14 Adelaide (Q4)."
+}

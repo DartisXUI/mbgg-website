@@ -4,6 +4,7 @@ import { Bell, LogOut, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 import { InstallButton, useStaffAlerts } from "@/components/HeaderWidgets";
+import { GameTicker } from "@/components/GameTicker";
 
 const links = (user) => [
   { to: "/", label: "Home", end: true },
@@ -60,7 +61,8 @@ export const SiteHeader = () => {
       <Link to="/" data-testid="widescreen-logo-header" className="block px-2 pt-3 sm:px-4">
         <img src="/brand/wide.png" alt="Murray Bridge Games Group" className="mx-auto h-auto max-h-[180px] w-full max-w-5xl object-contain" />
       </Link>
-      <nav className="sticky top-0 z-30 mt-2 border-b border-white/10 bg-[#0B0F19]/85 backdrop-blur-xl">
+      <div className="mt-2"><GameTicker /></div>
+      <nav className="sticky top-0 z-30 border-b border-white/10 bg-[#0B0F19]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
           <Link to="/" className="flex items-center gap-2" data-testid="nav-round-logo">
             <img src="/brand/round.png" alt="MBGG" className="h-9 w-9 rounded-full" />

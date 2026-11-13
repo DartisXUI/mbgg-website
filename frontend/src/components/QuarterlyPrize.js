@@ -15,7 +15,7 @@ export const QuarterlyPrize = () => {
     <section data-testid="quarterly-prize" className="panel panel-orange">
       <div className="eyebrow text-mb-orange">Q{d.quarter} {d.year} · ends {fmt(d.ends)}</div>
       <h2 className="mt-2 flex items-center gap-2 font-display text-3xl font-extrabold uppercase"><Award className="h-7 w-7 text-mb-orange" /> Subscriber score prize</h2>
-      <p className="mt-1 text-sm text-slate-400">At the end of March, June, September and December, the subscriber with the highest total score since 1 January wins a free prize.</p>
+      <p className="mt-1 text-sm text-slate-400">At the end of March, June, September and December, the subscriber with the highest total score since 1 January wins a free prize. Winners are confirmed a week after the quarter ends so late game logs still count.</p>
       <ol className="mt-4 space-y-1">
         {d.standings.slice(0, 5).map((s, i) => (
           <li key={s.user_id} data-testid={`quarterly-standing-${i + 1}`}>
