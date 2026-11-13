@@ -481,7 +481,7 @@ async def period_progress(user_id: str, year: int, idx: int) -> dict:
     rng = {"$gte": s.isoformat(), "$lte": e.isoformat()}
     dates = sorted({c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
                                                               {"_id": 0, "date": 1}).to_list(200)})
-    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": rng}))
+    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": rng, "at_meetup": True}))
     missing = [d for d in dates if d not in logged]
     return {"year": year, "period": idx, "label": f"{PERIOD_NAMES[idx]} {year}", "start": s.isoformat(),
             "end": e.isoformat(), "sessions": len(dates), "logged_sessions": len(dates) - len(missing),
@@ -554,7 +554,8 @@ async def unlogged_checkins(user_id: str) -> list[str]:
     rng = {"$gte": (today - timedelta(days=14)).isoformat(), "$lt": current_slot()[0]}
     dates = list({c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
                                                             {"_id": 0, "date": 1}).to_list(50)})
-    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": {"$in": dates}}))
+    logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": {"$in": dates},
+                                                            "at_meetup": True}))
     return sorted([d for d in dates if d not in logged], reverse=True)
 
 
@@ -660,6 +661,7 @@ class LogIn(BaseModel):
     score: int = Field(ge=-100000, le=10000000)
     placement: int = Field(ge=1, le=30)
     played_at: Optional[str] = None
+    at_meetup: bool = False
 
 
 @api.post("/logs")
@@ -676,6 +678,8 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
         raise HTTPException(400, "Invalid date")
     if pd > today or pd < today - timedelta(days=365):
         raise HTTPException(400, "Date must be within the last 365 days")
+    if body.at_meetup and not await db.checkins.find_one({"user_id": user["user_id"], "date": pd.isoformat()}, {"_id": 1}):
+        raise HTTPException(400, "You weren't checked in to a meetup that day. Untick 'Played at an IRL meetup'")
     key = " ".join(body.title.lower().split())
     existing = await db.game_logs.find_one({"title_key": key}, {"_id": 0, "title": 1})
     doc = body.model_dump() | {"id": uuid.uuid4().hex, "user_id": user["user_id"], "played_at": pd.isoformat(),
@@ -684,6 +688,12 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
     await db.game_logs.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+@api.get("/me/checkin-dates")
+async def my_checkin_dates(user: dict = Depends(get_current_user)):
+    cutoff = (local_now().date() - timedelta(days=366)).isoformat()
+    return sorted(set(await db.checkins.distinct("date", {"user_id": user["user_id"], "date": {"$gte": cutoff}})))
 
 
 @api.get("/logs/me")
@@ -942,7 +952,7 @@ async def session_summary(date: Optional[str] = None, staff: dict = Depends(requ
         Date.fromisoformat(d)
     except ValueError:
         raise HTTPException(400, "Invalid date")
-    logs = await db.game_logs.find({"played_at": d}, {"_id": 0}).to_list(2000)
+    logs = await db.game_logs.find({"played_at": d, "at_meetup": True}, {"_id": 0}).to_list(2000)
     names = {u["user_id"]: u["name"] for u in await db.users.find(
         {"user_id": {"$in": list({lg["user_id"] for lg in logs})}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(2000)}
     games: dict = {}

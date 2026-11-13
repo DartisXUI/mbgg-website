@@ -11,7 +11,7 @@ export const BonusCard = ({ data }) => {
     <div data-testid="bonus-card" className="panel panel-blue">
       <div className="eyebrow text-mb-blue">Log-every-session bonus · {c.label}</div>
       <h3 className="mt-2 flex items-center gap-2 font-display text-2xl font-extrabold uppercase"><Star className="h-6 w-6 text-mb-blue" /> {entries} free raffle entries</h3>
-      <p className="mt-1 text-sm text-slate-400">Check in digitally and log at least one game for every session you attend between {fmt(c.start)} and {fmt(c.end)}. Entries are added when the block ends{c.period === 5 ? ` (Nov–Dec entries go into the ${c.raffle_year} raffle)` : ""}.</p>
+      <p className="mt-1 text-sm text-slate-400">Check in digitally and log at least one game marked "Played at an IRL meetup" for every meetup you attend between {fmt(c.start)} and {fmt(c.end)}. Games played anywhere else don't count toward this. Entries are added when the block ends{c.period === 5 ? ` (Nov–Dec entries go into the ${c.raffle_year} raffle)` : ""}.</p>
       <div className="mt-4 flex justify-between text-sm">
         <span data-testid="bonus-progress">{c.logged_sessions} of {c.sessions} sessions logged</span>
         <span data-testid="bonus-status" className={c.qualifies ? "text-emerald-400" : "text-slate-400"}>{c.qualifies ? "On track" : c.sessions ? "Missing logs" : "No check-ins yet"}</span>

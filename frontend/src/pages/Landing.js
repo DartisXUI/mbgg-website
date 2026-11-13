@@ -94,7 +94,7 @@ const ForEveryone = () => (
         <Trophy className="h-8 w-8 shrink-0 text-mb-blue" />
         <div className="flex-1">
           <h3 className="font-display text-xl font-bold uppercase">Game log & leaderboards</h3>
-          <p className="mt-1 text-sm text-slate-400">Log your plays and climb the 365-day leaderboards. Log a game for every session you check in to across a 2-month block (Jan–Feb, Mar–Apr, May–Jun, Jul–Aug, Sep–Oct, Nov–Dec) and get 3 free entries into the end-of-year lucky number raffle.</p>
+          <p className="mt-1 text-sm text-slate-400">Log your plays from meetups or anywhere else (digital games count too) and climb the 365-day leaderboards. Log a meetup game for every IRL meetup you check in to across a 2-month block (Jan–Feb, Mar–Apr, May–Jun, Jul–Aug, Sep–Oct, Nov–Dec) and get 3 free entries into the end-of-year lucky number raffle.</p>
         </div>
         <Link to="/games" data-testid="landing-gamelog-link" className="btn-blue">Start logging</Link>
       </div>

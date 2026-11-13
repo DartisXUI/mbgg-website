@@ -39,7 +39,7 @@ const LogTable = ({ rows, onDelete }) => (
       <TableBody>
         {rows.map((r) => (
           <TableRow key={r.id} data-testid={`gamelog-row-${r.id}`} className="border-white/5">
-            <TableCell className="font-mono-x text-xs">{r.played_at}</TableCell>
+            <TableCell className="font-mono-x text-xs">{r.played_at}<div data-testid={`gamelog-where-${r.id}`} className={`mt-0.5 font-sans text-[10px] uppercase tracking-wider ${r.at_meetup ? "text-mb-orange" : "text-slate-500"}`}>{r.at_meetup ? "Meetup" : "Anywhere"}</div></TableCell>
             <TableCell className="font-semibold">{r.title}</TableCell>
             <TableCell className="text-slate-400">{r.genre}</TableCell>
             <TableCell>{r.player_count}</TableCell>
