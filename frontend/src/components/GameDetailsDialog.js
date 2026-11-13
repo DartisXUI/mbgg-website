@@ -16,7 +16,7 @@ const Owners = ({ owners, close }) => (
           <Link key={o.user_id} to={`/u/${o.user_id}`} onClick={close} data-testid={`game-owner-${o.user_id}`} className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0B0F19]/60 py-1 pl-1 pr-3 text-sm hover:border-[var(--mb-blue)]">
             <img src={o.picture || "/brand/round.png"} alt="" className="h-7 w-7 rounded-full object-cover" />
             <span className="font-semibold">{o.name}</span>
-            <span className="text-xs text-slate-500">{o.copies.map((c) => c.platform || CAT[c.category]).join(", ")}</span>
+            <span className="text-xs text-slate-500" title={o.copies.map((c) => c.title).join("\n")}>{o.copies.length > 1 ? plural(o.copies.length, "item") : o.copies[0].platform || CAT[o.copies[0].category]}</span>
           </Link>
         ))}
       </div>
@@ -34,7 +34,7 @@ const Recent = ({ recent }) => (
             <span className={`w-10 font-display text-lg font-black ${r.placement === 1 ? "text-mb-orange" : "text-slate-400"}`}>{ord(r.placement)}</span>
             <span className="flex-1 truncate"><b>{r.name}</b> <span className="text-xs text-slate-500">{r.title} · {r.player_count}p</span></span>
             <span className="font-mono-x">{r.score}</span>
-            <span className="hidden w-24 text-right text-xs text-slate-500 sm:inline">{r.played_at}</span>
+            <span className="w-20 text-right text-xs text-slate-500 sm:w-24">{r.played_at}</span>
           </li>
         ))}
       </ul>
@@ -51,7 +51,7 @@ export const GameDetailsDialog = ({ game, art, onClose }) => {
   }, [game]);
   return (
     <Dialog open={!!game} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent data-testid="game-details-dialog" className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#121826] sm:max-w-xl">
+      <DialogContent data-testid="game-details-dialog" className="max-h-[90vh] w-[calc(100%-1.5rem)] overflow-y-auto rounded-xl border-white/10 bg-[#121826] sm:max-w-xl">
         {game && (
           <>
             <DialogHeader>

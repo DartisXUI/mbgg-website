@@ -1026,6 +1026,8 @@ async def monthly_top_games(user: dict = Depends(get_current_user)):
 
 @api.get("/games/details")
 async def game_details(q: str = Query(min_length=2, max_length=60)):
+    if len(q.strip()) < 2:
+        raise HTTPException(422, "Search must be at least 2 characters")
     rx = {"$regex": re.escape(q.strip()), "$options": "i"}
     cutoff = (local_now().date() - timedelta(days=365)).isoformat()
     items = await db.collections.find({"title": rx}, {"_id": 0}).to_list(500)
