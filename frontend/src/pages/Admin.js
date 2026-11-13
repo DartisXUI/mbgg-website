@@ -45,11 +45,16 @@ const TokenAlerts = () => {
   );
 };
 
+const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", paid_earlier: "Free · paid earlier today" };
+
 const CheckinRoster = () => {
-  const [date, setDate] = useState(adelaideToday());
+  const [date, setDate] = useState("");
   const [data, setData] = useState(null);
   useEffect(() => {
-    http.get("/admin/checkins", { params: { date } }).then((r) => setData(r.data));
+    http.get("/admin/checkins", { params: date ? { date } : {} }).then((r) => {
+      setData(r.data);
+      if (!date) setDate(r.data.date);
+    });
     markCheckinsSeen();
   }, [date]);
   return (
@@ -57,13 +62,20 @@ const CheckinRoster = () => {
       <Input data-testid="admin-checkin-date-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11 w-48 bg-[#121826]" />
       <div className="panel !p-0">
         <div data-testid="admin-checkin-count" className="border-b border-white/10 px-5 py-3 font-display text-xl font-bold uppercase">{data?.headcount || 0} people · {data?.rows.length || 0} check-ins</div>
-        {data?.rows.map((r) => (
-          <div key={r.id} data-testid={`admin-checkin-row-${r.user_id}`} className="flex items-center gap-3 border-b border-white/5 px-5 py-3">
-            <div className="flex-1">
-              <div className="font-semibold">{r.name}</div>
-              {r.family.length > 0 && <div data-testid={`admin-checkin-family-${r.user_id}`} className="text-xs text-slate-400">+ {r.family.map((f) => f.name).join(", ")} (under 15, free)</div>}
+        {data && Object.entries(data.session_labels).map(([key, label]) => (
+          <div key={key} data-testid={`admin-checkin-session-${key}`}>
+            <div className="flex justify-between bg-white/[0.03] px-5 py-2 text-xs uppercase tracking-widest text-slate-400">
+              <span>{label}</span><span data-testid={`admin-checkin-session-count-${key}`}>{data.session_headcount[key]} people</span>
             </div>
-            <span className={`text-sm ${r.via === "paid" ? "text-mb-blue" : "text-mb-orange"}`}>{{ subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5" }[r.via]}</span>
+            {data.rows.filter((r) => r.session === key).map((r) => (
+              <div key={r.id} data-testid={`admin-checkin-row-${r.user_id}-${key}`} className="flex items-center gap-3 border-b border-white/5 px-5 py-3">
+                <div className="flex-1">
+                  <div className="font-semibold">{r.name}</div>
+                  {r.family.length > 0 && <div data-testid={`admin-checkin-family-${r.user_id}-${key}`} className="text-xs text-slate-400">+ {r.family.map((f) => f.name).join(", ")} (under 15, free)</div>}
+                </div>
+                <span className={`text-sm ${r.via === "paid" ? "text-mb-blue" : "text-mb-orange"}`}>{VIA[r.via]}</span>
+              </div>
+            ))}
           </div>
         ))}
       </div>

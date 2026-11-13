@@ -4,8 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { startCheckout } from "@/lib/api";
 
 const PERKS = [
-  { icon: CalendarCheck, title: "Check in free", text: "Everyone checks in on the site or app. Members never pay the $5 again, and can track attendance against what they paid." },
-  { icon: Coffee, title: "Free drink & snack", text: "1 x drink and snack (hot, cold or otherwise) during free admission sessions." },
+  { icon: CalendarCheck, title: "Check in free", text: "Everyone checks in on the site or app. Members are not required to pay the admission while subscribed, and can track attendance against what they paid." },
+  { icon: Coffee, title: "Free drink & snack", text: "A free drink and snack (hot, cold or otherwise) during free admission sessions." },
   { icon: Crown, title: "Guaranteed game choice", text: "1 x guaranteed game pick every month. Tap your token and the hosts are alerted." },
   { icon: Gift, title: "Win without being there", text: "Raffle prizes are held for you until collection, for up to 3 months." },
   { icon: Award, title: "Quarterly score prize", text: "The subscriber with the top total score at the end of March, June, September and December wins a free prize." },
@@ -82,7 +82,7 @@ const ForEveryone = () => (
     <div className="panel panel-blue">
       <CalendarCheck className="h-6 w-6 text-mb-blue" />
       <h3 className="mt-3 font-display text-xl font-bold uppercase">Digital check-in</h3>
-      <p className="mt-1 text-sm text-slate-400">Everyone checks in on arrival. Tap check in, pay the $5 admission and you're on the host's list. Kids under 15 with you come in free and don't need a login.</p>
+      <p className="mt-1 text-sm text-slate-400">Everyone checks in on arrival. Tap check in, pay the $5 admission and you're on the host's list. Sessions run 10am–2pm and 4pm–late, and if you paid for the day session the evening one is free. Kids under 15 with you come in free and don't need a login.</p>
     </div>
     <div className="panel panel-red">
       <Ticket className="h-6 w-6 text-mb-red" />

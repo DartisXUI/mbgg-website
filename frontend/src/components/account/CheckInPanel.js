@@ -22,7 +22,7 @@ export const CheckInCard = ({ data, reload }) => {
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState([]);
   const u = data.user;
-  const free = data.free_entry;
+  const free = data.free_entry || data.second_session_free;
   const inIds = new Set((data.today_checkin?.family || []).map((f) => f.id));
   const kids = (u.family || []).filter((f) => under15(f) && !inIds.has(f.id));
   const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -48,21 +48,22 @@ export const CheckInCard = ({ data, reload }) => {
     run(() => http.post("/checkin", { family_ids: picked }), u.is_subscriber ? "Checked in! Grab your free drink & snack." : "Checked in with free host admission");
   };
   const addKids = () => run(() => http.post("/checkin/family", { family_ids: picked }), "Family checked in free");
-  const note = u.is_subscriber ? "Your membership covers admission, plus your free drink & snack." : free ? "Hosts & admins get free admission." : `Tap to pay the ${money(500)} admission and you're on the list.`;
+  const note = u.is_subscriber ? "Members are not required to pay the admission while subscribed, plus a free drink and snack." : data.free_entry ? "Hosts & admins get free admission." : data.second_session_free ? "You paid for the day session, so this evening session is free." : `Tap to pay the ${money(500)} admission and you're on the list. Paying for the day session makes the evening session free.`;
   const label = free ? `Check in free${picked.length ? ` + ${picked.length} under 15` : ""}` : `Check in & pay $5${picked.length ? ` + ${picked.length} free under 15` : ""}`;
 
   return (
     <div data-testid="checkin-card" className="panel panel-red">
-      <div className="eyebrow text-mb-red">Today · {data.today}</div>
+      <div className="eyebrow text-mb-red">{data.today}</div>
       <h3 className="mt-2 font-display text-2xl font-extrabold uppercase">Session check-in</h3>
-      <p className="mt-1 text-xs text-slate-500">Everyone checks in here when they arrive.</p>
+      <div data-testid="checkin-session-label" className="mt-1 text-sm font-semibold text-mb-blue">{data.session.label}</div>
+      <p className="mt-1 text-xs text-slate-500">Everyone checks in here for each session they attend.</p>
       {data.checked_in_today ? (
         <>
           <div data-testid="checkin-status-done" className="mt-4 flex items-center gap-3 rounded-lg bg-emerald-500/10 p-4 text-emerald-300">
             <CalendarCheck className="h-6 w-6 shrink-0" />
             <div>
-              <div className="font-semibold">You're checked in for today</div>
-              {u.is_subscriber && <div className="flex items-center gap-1 text-sm"><Coffee className="h-4 w-4" /> 1 x free drink & snack included</div>}
+              <div className="font-semibold">You're checked in for this session</div>
+              {u.is_subscriber && <div className="flex items-center gap-1 text-sm"><Coffee className="h-4 w-4" /> A free drink and snack included</div>}
               {inIds.size > 0 && (
                 <div data-testid="checkin-family-done" className="flex items-center gap-1 text-sm"><Baby className="h-4 w-4" /> With {data.today_checkin.family.map((f) => f.name).join(", ")}</div>
               )}

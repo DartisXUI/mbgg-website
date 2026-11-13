@@ -47,7 +47,8 @@ INDEXES: dict[str, list[IndexModel]] = {
     "login_attempts": [IndexModel([("email", ASCENDING), ("at", DESCENDING)], name="email_at")],
     "payments": [IndexModel([("checkout_id", ASCENDING)], name="checkout_id", unique=True),
                  IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created")],
-    "checkins": [IndexModel([("user_id", ASCENDING), ("date", ASCENDING)], name="user_date", unique=True),
+    "checkins": [IndexModel([("user_id", ASCENDING), ("date", ASCENDING), ("session", ASCENDING)],
+                             name="user_date_session", unique=True),
                  IndexModel([("date", ASCENDING)], name="date")],
     "game_logs": [IndexModel([("user_id", ASCENDING), ("played_at", DESCENDING)], name="user_played"),
                   IndexModel([("played_at", DESCENDING), ("title_key", ASCENDING)], name="played_title")],
@@ -81,6 +82,20 @@ def parse_dt(s: str) -> datetime:
 
 def local_now() -> datetime:
     return now().astimezone(TZ)
+
+
+SESSION_LABELS = {"day": "Day session (10am–2pm)", "evening": "Evening session (4pm–late)"}
+
+
+def current_slot() -> tuple[str, str]:
+    t = local_now()
+    if t.hour < 5:
+        return (t.date() - timedelta(days=1)).isoformat(), "evening"
+    return t.date().isoformat(), ("day" if t.hour < 15 else "evening")
+
+
+async def paid_earlier(user_id: str, date: str) -> bool:
+    return bool(await db.checkins.find_one({"user_id": user_id, "date": date, "via": "paid"}, {"_id": 1}))
 
 
 def is_subscriber(u: dict) -> bool:
@@ -325,10 +340,13 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
     if body.product == "checkin":
         if free_entry(user):
             raise HTTPException(400, "You check in free. Use the free check-in button")
-        meta["date"] = local_now().date().isoformat()
+        meta["date"], meta["session"] = current_slot()
         meta["family"] = eligible_family(user, body.family_ids)
-        if await db.checkins.find_one({"user_id": user["user_id"], "date": meta["date"]}, {"_id": 1}):
-            raise HTTPException(400, "You're already checked in today")
+        if await paid_earlier(user["user_id"], meta["date"]):
+            raise HTTPException(400, "You already paid today, so this session is free. Use the free check-in button")
+        if await db.checkins.find_one({"user_id": user["user_id"], "date": meta["date"], "session": meta["session"]},
+                                      {"_id": 1}):
+            raise HTTPException(400, "You're already checked in for this session")
     if body.product == "raffle":
         meta["quantity"] = body.quantity
         meta["year"] = local_now().year
@@ -337,7 +355,7 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
     recent = await db.payments.find_one(
         {"user_id": user["user_id"], "product": body.product, "amount_cents": amount, "status": "PENDING",
          "checkout_url": {"$exists": True}, "created_at": {"$gte": iso(now() - timedelta(minutes=20))},
-         "meta.date": meta.get("date"), "meta.family": meta.get("family")}, {"_id": 0}, sort=[("created_at", -1)])
+         "meta.date": meta.get("date"), "meta.session": meta.get("session"), "meta.family": meta.get("family")}, {"_id": 0}, sort=[("created_at", -1)])
     if recent and recent["product"] != "raffle":
         return {"checkout_id": recent["checkout_id"], "checkout_url": recent["checkout_url"]}
     origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
@@ -389,6 +407,7 @@ async def fulfil(p: dict) -> dict:
     elif p["product"] == "checkin":
         with suppress(DuplicateKeyError):
             await db.checkins.insert_one({"id": uuid.uuid4().hex, "user_id": p["user_id"], "date": p["meta"]["date"],
+                                          "session": p["meta"].get("session", "day"),
                                           "via": "paid", "family": p["meta"].get("family", []),
                                           "created_at": iso(now())})
     elif p["product"] == "raffle":
@@ -496,6 +515,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
     await reconcile_pending(user["user_id"])
     await award_bonuses(user["user_id"])
     user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    slot_date, slot = current_slot()
     today = local_now().date().isoformat()
     month = local_now().strftime("%Y-%m")
     period_start = (user.get("subscription_started_at") if is_subscriber(user)
@@ -511,12 +531,15 @@ async def dashboard(user: dict = Depends(get_current_user)):
     bonus_now = await period_progress(user["user_id"], ld.year, (ld.month - 1) // 2)
     bonuses = await db.raffle_bonuses.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
     prizes = await db.prizes.find({"user_id": user["user_id"]}, {"_id": 0}).sort("won_at", -1).to_list(50)
-    today_checkin = checkins[0] if checkins and checkins[0]["date"] == today else None
-    return {"user": me_view(user), "today": today, "checked_in_today": bool(today_checkin),
+    today_checkin = next((c for c in checkins if c["date"] == slot_date and c.get("session", "day") == slot), None)
+    second_free = not free_entry(user) and await paid_earlier(user["user_id"], slot_date)
+    return {"user": me_view(user), "today": slot_date, "checked_in_today": bool(today_checkin),
+            "session": {"key": slot, "label": SESSION_LABELS[slot]}, "second_session_free": second_free,
             "today_checkin": today_checkin, "free_entry": free_entry(user),
             "unlogged_dates": await unlogged_checkins(user["user_id"]),
             "attendance": {"sessions": len(in_period), "since": start_date,
-                           "door_value_cents": len(in_period) * CHECKIN_CENTS, "membership_cents": ANNUAL_CENTS},
+                           "door_value_cents": len({c["date"] for c in in_period}) * CHECKIN_CENTS,
+                           "membership_cents": ANNUAL_CENTS},
             "recent_checkins": checkins[:8], "token": token, "month": month,
             "raffle_entries": [{"number": r["number"], "source": r.get("source", "purchase")} for r in raffle],
             "raffle_entry_cents": RAFFLE_CENTS, "bonus": {"current": bonus_now, "awarded": bonuses,
@@ -528,8 +551,8 @@ async def dashboard(user: dict = Depends(get_current_user)):
 async def unlogged_checkins(user_id: str) -> list[str]:
     today = local_now().date()
     rng = {"$gte": (today - timedelta(days=14)).isoformat(), "$lt": today.isoformat()}
-    dates = [c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
-                                                       {"_id": 0, "date": 1}).to_list(50)]
+    dates = list({c["date"] for c in await db.checkins.find({"user_id": user_id, "date": rng},
+                                                            {"_id": 0, "date": 1}).to_list(50)})
     logged = set(await db.game_logs.distinct("played_at", {"user_id": user_id, "played_at": {"$in": dates}}))
     return sorted([d for d in dates if d not in logged], reverse=True)
 
@@ -574,7 +597,8 @@ async def family_checkin(body: CheckinIn, user: dict = Depends(get_current_user)
     fam = eligible_family(user, body.family_ids)
     if not fam:
         raise HTTPException(400, "Pick who is with you")
-    q = {"user_id": user["user_id"], "date": local_now().date().isoformat()}
+    d, s = current_slot()
+    q = {"user_id": user["user_id"], "date": d, "session": s}
     row = await db.checkins.find_one(q, {"_id": 0})
     if not row:
         raise HTTPException(400, "Check yourself in first")
@@ -587,16 +611,21 @@ async def family_checkin(body: CheckinIn, user: dict = Depends(get_current_user)
 
 @api.post("/checkin")
 async def free_checkin(body: Optional[CheckinIn] = None, user: dict = Depends(get_current_user)):
-    if not free_entry(user):
+    d, s = current_slot()
+    if free_entry(user):
+        via = "subscription" if is_subscriber(user) else "staff"
+    elif await paid_earlier(user["user_id"], d):
+        via = "paid_earlier"
+    else:
         raise HTTPException(402, "Admission is $5. Use check in & pay")
     family = eligible_family(user, body.family_ids if body else [])
-    doc = {"id": uuid.uuid4().hex, "user_id": user["user_id"], "date": local_now().date().isoformat(),
-           "via": "subscription" if is_subscriber(user) else "staff", "family": family, "created_at": iso(now())}
+    doc = {"id": uuid.uuid4().hex, "user_id": user["user_id"], "date": d, "session": s,
+           "via": via, "family": family, "created_at": iso(now())}
     try:
         await db.checkins.insert_one(doc)
     except DuplicateKeyError:
-        raise HTTPException(400, "You're already checked in today")
-    return {"ok": True, "date": doc["date"]}
+        raise HTTPException(400, "You're already checked in for this session")
+    return {"ok": True, "date": d, "session": s}
 
 
 # ---------- Monthly game choice token ----------
@@ -836,6 +865,7 @@ async def admin_summary(since: Optional[str] = None, user: dict = Depends(requir
         names = {u["user_id"]: u["name"] for u in await db.users.find(
             {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(50)}
         new = [{"id": r["id"], "name": names.get(r["user_id"], "Someone"), "via": r["via"],
+                "session": r.get("session", "day"),
                 "family_count": len(r.get("family", [])), "created_at": r["created_at"]} for r in rows]
     return {"unacked_tokens": await db.token_uses.count_documents({"acknowledged": False}),
             "checkins_today": await db.checkins.count_documents({"date": today}),
@@ -858,12 +888,15 @@ async def ack_alert(alert_id: str, user: dict = Depends(require_staff)):
 
 @api.get("/admin/checkins")
 async def admin_checkins(date: Optional[str] = None, user: dict = Depends(require_staff)):
-    d = date or local_now().date().isoformat()
+    d = date or current_slot()[0]
     rows = await db.checkins.find({"date": d}, {"_id": 0}).sort("created_at", 1).to_list(500)
     users = {u["user_id"]: u for u in await db.users.find(
         {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0}).to_list(500)}
-    return {"date": d, "headcount": sum(1 + len(r.get("family", [])) for r in rows),
+    heads = {s: sum(1 + len(r.get("family", [])) for r in rows if r.get("session", "day") == s) for s in SESSION_LABELS}
+    return {"date": d, "headcount": sum(heads.values()), "session_headcount": heads,
+            "session_labels": SESSION_LABELS,
             "rows": [r | {"name": users.get(r["user_id"], {}).get("name"), "family": r.get("family", []),
+                          "session": r.get("session", "day"),
                           "is_subscriber": is_subscriber(users.get(r["user_id"], {}))} for r in rows]}
 
 
@@ -1025,6 +1058,8 @@ async def seed_admin() -> None:
 
 @app.on_event("startup")
 async def startup():
+    with suppress(Exception):
+        await db.checkins.drop_index("user_date")
     app.state.index_task = asyncio.create_task(ensure_indexes())
     await seed_admin()
 
