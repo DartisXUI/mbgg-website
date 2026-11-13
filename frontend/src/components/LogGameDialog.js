@@ -30,7 +30,7 @@ export const LogGameDialog = ({ genres, titles, playerTag, onSaved }) => {
   const canMeetup = checkins.includes(f.played_at);
   useEffect(() => {
     setF((p) => ({ ...p, at_meetup: canMeetup }));
-  }, [canMeetup]);
+  }, [canMeetup, open]);
   const set = (k, num) => (e) => setF({ ...f, [k]: num ? Number(e.target.value) : e.target.value });
   const suggestions = [...new Set([...titles, ...FAVOURITE_GAMES.map((g) => g.name)])];
 
@@ -41,7 +41,7 @@ export const LogGameDialog = ({ genres, titles, playerTag, onSaved }) => {
     try {
       await http.post("/logs", { ...f, at_meetup: canMeetup && f.at_meetup });
       toast.success(`${f.title} logged`);
-      setF({ ...blank, title: f.title, genre: f.genre });
+      setF({ ...blank, title: f.title, genre: f.genre, played_at: f.played_at, at_meetup: canMeetup });
       setOpen(false);
       onSaved();
       window.dispatchEvent(new Event("mbgg-logged"));

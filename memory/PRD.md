@@ -32,6 +32,8 @@ Choices: Square (AUD), Google + email/password login (no Facebook), one admin wh
 
 - Tap-for-details on strip tiles: public GET /api/games/details?q= (owners from collections, recent scores last 365 days); Soloverse tile now uses its box image. Tested iteration_6.
 
+- Games can be logged anywhere (at_meetup flag; "Played at an IRL meetup" switch only available on check-in dates). Raffle 2-month bonus, reminders and host session summary count only meetup logs; leaderboards/monthly stats count all. Tested iteration_7.
+
 ## Backlog
 - P1: Square webhook for payments where user never returns; admin manual "paid cash"/grant membership; prize holding tracker (3-month window)
 - P2: push notifications to hosts for token alerts; shadcn date picker; raffle draw tool

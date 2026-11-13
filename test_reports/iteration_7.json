@@ -1,0 +1,28 @@
+{
+  "summary": "Tested logging games played anywhere vs at an IRL meetup. Backend: 12 of 12 pytest checks pass. POST /api/logs defaults at_meetup to false and accepts dates up to 360 days back with no check-in. at_meetup=true without a check-in returns 400; with a check-in it returns 200. Dates more than 365 days back or in the future return 400, and a non-boolean at_meetup returns 422. GET /api/me/checkin-dates returns distinct sorted dates, leaves out a 400-day-old check-in and returns 401 when logged out. Raffle bonus for past block Sep-Oct 2026 (check-ins on 09-05 and 10-10): with only anywhere logs, or a meetup log on just one date, no bonus is given. Once both dates have meetup logs, one bonus is awarded (2026 period 4, 3 entries, 3 raffle numbers from 'bonus'). Reminders and dashboard unlogged_dates/bonus.current.missing_dates still list a check-in date that only has an anywhere log, and drop it after a meetup log is added. The admin session summary shows only meetup logs. Leaderboards and monthly stats include both kinds of log. UI (desktop and 390px mobile): with no check-in the switch is disabled and the hint says 'played anywhere'. On a check-in date the switch is enabled and ON by default. Turning it off saves as anywhere. The table shows MEETUP/ANYWHERE badges (gamelog-where-<id>). The reminder banner shows and then disappears after a meetup log. The honour note, banner, bonus card and landing text describe the rule. FOUND 1 BUG: the switch default is lost on the second log for the same check-in date.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "LogGameDialog", "issue": "Repro: the user is checked in today (the common case at a meetup) and logs two games in a row with the default date. The first log saves at_meetup=true. On the second open the switch is enabled but OFF, so the log saves at_meetup=false without warning (confirmed in the DB), which can cost the user the raffle bonus. RCA: after saving, setF({...blank}) clears at_meetup because blank has no at_meetup key. The useEffect that sets at_meetup only runs when canMeetup changes, and canMeetup stays true. Fix: reset at_meetup when the dialog opens or when played_at changes (e.g. useEffect on [canMeetup, open, f.played_at]). Alternatively, keep at_meetup: canMeetup in the reset, or derive the default with ?? (checked = canMeetup && (f.at_meetup ?? true)).", "selector": "[data-testid='log-at-meetup-switch']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "LogGameDialog", "issues": ["When the user turns the switch OFF on a check-in date, the hint still reads 'Meetup results count toward the 2-month raffle bonus'. Change the text to say this game won't count toward the bonus.", "Your player ID is empty for users with no player_tag (minor, existing behaviour)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration7_meetup_logs.py", "/app/backend/tests/ui_seed_iter7.py", "/app/test_reports/pytest/pytest_iter7.xml"],
+  "action_items": [
+    "Fix the LogGameDialog at_meetup default being lost after a save when the date's check-in status does not change (see RCA)",
+    "Optional: change the switch hint when the user turns it OFF on a check-in date"
+  ],
+  "critical_code_review_comments": [
+    "There is no migration for game_logs created before this change. Any older log without at_meetup is now treated as an anywhere log, so existing users get reminders and lose bonus progress for meetups they did log. The DB currently has 0 logs, so nothing is affected here. If production has older logs, run a one-off update_many to set at_meetup=true where a check-in exists for user_id+played_at, and false otherwise.",
+    "Deleting a check-in does not change the at_meetup flag on existing logs. This is acceptable, but period_progress only counts check-in dates, so it stays consistent."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration7_meetup_logs.py", "/app/backend/tests/ui_seed_iter7.py"],
+  "success_rate": {"backend": "100%", "frontend": "90% (1 switch-default bug)"},
+  "seed_data_creation": "Created TEST_meet/cdates/bonus/remind/sess/lb/meetui users with their check-ins, logs, raffle bonuses and entries. All were removed by conftest teardown and ui_seed_iter7 cleanup (TEST_ users = 0, game_logs = 0). Admin data was not touched; the admin was used only for GET /api/admin/sessions.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && python -m pytest test_iteration7_meetup_logs.py -p no:xdist -o addopts=''. The past-block bonus test assumes the current date is Nov-Dec 2026 (it skips otherwise). For the UI: python ui_seed_iter7.py setup creates a user with a check-in 3 days ago and writes the token to /tmp/ui_iter7.json; then run 'cleanup'. To retest the bug, also insert a check-in for the current slot date and log twice with the default date."
+}
