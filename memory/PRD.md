@@ -28,7 +28,7 @@ Choices: Square (AUD), Google + email/password login (no Facebook), one admin wh
 
 ## Iteration 4-5 (2026-11-13)
 - Per-session check-ins: day 10am–2pm / evening 4pm–late (00:00–04:59 counts as previous date's evening); paying for one session makes the other session that day free (via paid_earlier); roster grouped by session; door value per date. Perk text edits (free admission wording, "A free drink and snack ... during special member-wide free admission sessions"). Session-date defaults for logs/reminders/admin. Tested iteration_4/5 (62/62 backend).
-- Ticker now uses customer-supplied box art/logos (/public/games, white backgrounds removed); Flip 7 and Mario Kart remain text tiles (no image supplied); Super Smash Bros. Ultimate added; King of Tokyo rotates 3 box images; Soloverse unchanged.
+- Ticker now uses customer-supplied box art/logos (/public/games, white backgrounds removed); Mario Kart removed; Flip 7 rotates Flip 7 / With a Vengeance boxes; Project L uses customer-cleaned image; Super Smash Bros. Ultimate added; King of Tokyo rotates 3 box images; Soloverse unchanged.
 
 ## Backlog
 - P1: Square webhook for payments where user never returns; admin manual "paid cash"/grant membership; prize holding tracker (3-month window)

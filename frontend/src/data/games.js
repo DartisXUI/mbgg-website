@@ -1,10 +1,10 @@
 export const FAVOURITE_GAMES = [
-  { name: "Flip 7", sub: "With a Vengeance · Custom Combo Deck", kind: "card" },
+  { name: "Flip 7", sub: "With a Vengeance · Custom Combo Deck", kind: "card", imgs: ["/games/flip7.webp", "/games/flip7-v.webp"] },
   { name: "Love Letter", sub: "", kind: "card", img: "/games/ll.webp" },
   { name: "Tacta", sub: "", kind: "board", img: "/games/tacta.webp" },
   { name: "Star Realms", sub: "", kind: "card", img: "/games/sr.webp" },
   { name: "Shards of Infinity", sub: "Saga Collection", kind: "card", img: "/games/soi-sc.webp" },
-  { name: "Project L", sub: "All In KSE", kind: "board", img: "/games/pl-kse.webp" },
+  { name: "Project L", sub: "All In KSE", kind: "board", img: "/games/pl-kse.webp?v=2" },
   { name: "Dominion", sub: "", kind: "card", img: "/games/dominion.webp" },
   { name: "Nexus Ops", sub: "Renegade Studios", kind: "board", img: "/games/nops.webp" },
   { name: "King of Tokyo", sub: "Godzilla · New York · Monster Island + expansions", kind: "board", imgs: ["/games/kot-g.webp", "/games/kot-mb.webp", "/games/komi.webp"] },
@@ -18,7 +18,6 @@ export const FAVOURITE_GAMES = [
   { name: "12 Rivers", sub: "", kind: "board", img: "/games/12r.webp" },
   { name: "Splendor", sub: "Marvel Splendor", kind: "board", img: "/games/ms.webp" },
   { name: "Brawlhalla", sub: "", kind: "digital", img: "/games/brawlhalla.webp" },
-  { name: "Mario Kart", sub: "", kind: "digital" },
   { name: "Super Smash Bros. Ultimate", sub: "", kind: "digital", img: "/games/ssbrosu.webp" },
 ];
 

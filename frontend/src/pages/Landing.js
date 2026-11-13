@@ -45,7 +45,7 @@ const Hero = () => (
         <br />Games Group
       </h1>
       <p className="mt-6 max-w-xl text-base text-slate-300 sm:text-lg">
-        A community that plays everything from deck-builders to Mario Kart. Make an account to check in and pay online, log your games and see how you stack up.
+        A community that plays everything from deck-builders to Smash Bros. Make an account to check in and pay online, log your games and see how you stack up.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/account" data-testid="hero-checkin-button" className="btn-red">Check in · $5</Link>
