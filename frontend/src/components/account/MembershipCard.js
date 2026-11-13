@@ -1,5 +1,5 @@
 import { Progress } from "@/components/ui/progress";
-import { money, startCheckout } from "@/lib/api";
+import { money, plural, startCheckout } from "@/lib/api";
 
 const fmt = (s) => new Date(s).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 
@@ -23,7 +23,7 @@ export const MembershipCard = ({ data }) => {
       )}
       <div className="mt-5">
         <div className="flex justify-between text-sm">
-          <span data-testid="attendance-sessions">{a.sessions} sessions since {a.since}</span>
+          <span data-testid="attendance-sessions">{plural(a.sessions, "session")} since {a.since}</span>
           <span data-testid="attendance-value" className="font-mono-x text-mb-orange">{money(a.door_value_cents)} / {money(a.membership_cents)}</span>
         </div>
         <Progress value={pct} className="mt-2 h-2 bg-white/10 [&>div]:bg-[var(--mb-orange)]" />

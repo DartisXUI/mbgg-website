@@ -16,6 +16,6 @@ else:
     ids = [v["user_id"] for v in json.load(open(F)).values()]
     q = {"user_id": {"$in": ids}}
     _delete_square_links([p["square_link_id"] for p in mdb.payments.find(q) if p.get("square_link_id")])
-    for c in ("user_sessions", "game_logs", "checkins", "token_uses", "collections", "payments", "raffle_entries"):
+    for c in ("user_sessions", "game_logs", "checkins", "token_uses", "collections", "payments", "raffle_entries", "raffle_bonuses", "prizes"):
         mdb[c].delete_many(q)
     print(mdb.users.delete_many(q).deleted_count, "users removed")

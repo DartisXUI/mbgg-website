@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 2: tested all 8 requested items (backend + UI). Backend: 36/36 pytest pass (8 new iteration-2 tests covering open logs/leaderboards for non-subscribers, cash membership grant + extend + 403 for host/member, prizes CRUD with collect_by = won_at + 3 months (including the 2026-08-31 -> 2026-11-30 month-end clamp), raffle bonus awarded exactly once for a completed Sep-Oct 2026 block and not awarded when one log is missing, current-block progress, session summary grouping/sort/403, monthly top games, plus the previous regression suite). UI: landing hero colours confirmed (MURRAY rgb(255,255,255), BRIDGE rgb(18,164,245)=#12a4f5, GAMES GROUP rgb(248,250,252) near-white; the header and footer brand text match), game log perk sits in the 'Every account' section with the bonus wording, non-subscriber /games and /leaderboards load and logging via the dialog works, the monthly-top-games section renders, bonus-card progress/status/missing dates render, prizes-card shows collect-by, expired and collected states, admin Members cash grant via window.confirm (button changes from 'give year' to '+1 year', the 2nd click adds a year, history shows 2 'Annual Membership (cash at door)' COMPLETED), the Prizes tab add and mark-collected work, and the Session summary tab with chips, date input and empty state works. Regression: login, free check-in, monthly token, collections (API) and Square donation link creation (redirect to square.link was intercepted, nothing was paid) all pass. No functional bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "award_bonuses (GET /api/me/dashboard)", "issue": "Only checks the previous year's Nov-Dec block and the current year's blocks. A user who qualified for e.g. Sep-Oct 2026 but doesn't open the dashboard until Jan 2027 never gets those entries. Awarding is lazy (dashboard-only) with no backfill or scheduled job."},
+      {"endpoint": "POST /api/admin/prizes", "issue": "won_at isn't range-checked: future or very old dates are accepted. Marking an already-collected prize collected again overwrites collected_at and handed_over_by."},
+      {"endpoint": "GET /api/admin/sessions", "issue": "The date query param isn't validated. Any string is accepted and returns an empty summary instead of a 400."},
+      {"endpoint": "POST /api/admin/users/{id}/grant-membership", "issue": "No double-submit guard: two fast clicks (or two admins) add two years and record two $120 cash payments. Consider idempotency or disabling the button while the request is running."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Admin Session summary / Prize tracker", "issue": "http.get calls in SessionSummary and PrizeTracker have no .catch or error state. If the request fails, SessionSummary renders nothing (null) for good and the prize list stays empty with no message.", "affected_selectors": ["[data-testid='session-summary']", "[data-testid^='prize-row-']"]}
+    ],
+    "design_issues": [
+      {"screen": "Admin Session summary / Prizes / Check-ins", "issues": ["Native browser date pickers (type=date) are used for session-date-input, prize-date-input and admin-checkin-date-input. They display in US format (11/14/2026) for an Australian audience; consider the shadcn Calendar/Popover."]},
+      {"screen": "Admin Members tab (mobile 390px)", "issues": ["Rows are cramped: names wrap onto 2 lines, the email is truncated to ~8 chars and the 'Make host' button drops to a new line. Consider stacking the info above the actions on mobile."]},
+      {"screen": "Admin Members tab", "issues": ["The 'Paid cash · give year' button also shows on the admin's own row (minor)."]},
+      {"screen": "Account membership card", "issues": ["Grammar: '1 sessions since ...' should be '1 session' (use the plural helper)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration2_features.py", "/app/backend/tests/test_mbgg_api.py", "/app/backend/tests/ui_seed_iter2.py", "/app/test_reports/pytest/pytest_results_iter2.xml"],
+  "action_items": [
+    "Optional: backfill bonus awarding for all completed blocks from the previous calendar year (not only Nov-Dec), or run it on a schedule",
+    "Add error handling (catch + message) to SessionSummary and PrizeTracker loads",
+    "Disable the grant-membership button while its request is running to avoid double grants",
+    "Validate the date param on /api/admin/sessions and the won_at range on /api/admin/prizes",
+    "Polish: shadcn date picker in place of native date inputs, mobile layout of the admin Members rows, '1 sessions' pluralisation"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 872 lines; split it into routers (auth, payments, logs, admin, bonus) to stay under 700 lines",
+    "award_bonuses runs up to 7 period_progress queries on every dashboard load. Acceptable at this scale, but it could short-circuit with one find over raffle_bonuses",
+    "session_summary reads lg['genre'] / lg['playtime_min'] directly, so it raises a KeyError if any legacy log lacks these fields; use .get"
+  ],
+  "updated_files": ["/app/backend/tests/test_mbgg_api.py (non-sub gate test updated: logs and leaderboards now return 200)", "/app/backend/tests/conftest.py (cleanup now also removes raffle_bonuses and prizes)", "/app/backend/tests/ui_fixtures.py (same cleanup addition)", "/app/backend/tests/test_iteration2_features.py (new)", "/app/backend/tests/ui_seed_iter2.py (new)"],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "100% of tested flows"},
+  "seed_data_creation": "Only TEST_ users, created through register; checkins, game_logs and prizes were inserted for them. All removed afterwards by user_id (0 TEST users, prizes, bonuses or TEST logs remain). The one Square link created was deleted by the cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/. For UI: python3 tests/ui_fixtures.py setup, then python3 tests/ui_seed_iter2.py (adds a today check-in and an expired prize for nonsub), and python3 tests/ui_fixtures.py cleanup at the end. Date during testing was 2026-11-14 Adelaide (Nov-Dec block, bonus raffle_year 2027); the bonus test seeds Sep-Oct 2026 dates. If the date moves into 2027, the hardcoded 2026-09/10 dates in TestRaffleBonus fall outside the awarded periods and must be updated. Square keys are LIVE: intercept **/*square*/** routes in Playwright and never pay."
+}

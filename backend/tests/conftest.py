@@ -76,6 +76,6 @@ def cleanup_all():
              if p.get("square_link_id")]
     _delete_square_links(links)
     for coll in ("user_sessions", "game_logs", "checkins", "token_uses", "collections", "payments",
-                 "raffle_entries"):
+                 "raffle_entries", "raffle_bonuses", "prizes"):
         mdb[coll].delete_many(q)
     mdb.users.delete_many(q)

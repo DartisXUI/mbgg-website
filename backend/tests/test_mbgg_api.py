@@ -96,8 +96,9 @@ class TestNonSubscriber:
         r = s.post(f"{BASE_URL}/api/logs", json={"title": "TEST_Game", "genre": "Strategy", "player_count": 4,
                                                  "player_id": "p1", "playtime_min": 30, "score": 10,
                                                  "placement": 1})
-        assert r.status_code == 403
-        assert s.get(f"{BASE_URL}/api/leaderboards").status_code == 403
+        # iteration 2: game logs + leaderboards are open to every account
+        assert r.status_code == 200
+        assert s.get(f"{BASE_URL}/api/leaderboards").status_code == 200
         assert s.post(f"{BASE_URL}/api/token/use", json={"game": "Catan"}).status_code == 403
         assert s.post(f"{BASE_URL}/api/checkin").status_code == 402
         d = s.get(f"{BASE_URL}/api/me/dashboard")

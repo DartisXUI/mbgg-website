@@ -11,9 +11,11 @@ const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString("en-AU", { weekd
 export const SessionSummary = () => {
   const [date, setDate] = useState(adelaideToday());
   const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    http.get("/admin/sessions", { params: { date } }).then((r) => setData(r.data));
+    http.get("/admin/sessions", { params: { date } }).then((r) => { setData(r.data); setFailed(false); }).catch((e) => { setFailed(true); toast.error(errMsg(e)); });
   }, [date]);
+  if (failed && !data) return <p data-testid="session-summary-error" className="panel text-center text-mb-red">Couldn't load the session summary. Try again.</p>;
   if (!data) return null;
   const stats = [["Checked in", data.attendees], ["Players who logged", data.loggers], ["Results logged", data.logs], ["Games played", data.games.length]];
   return (
@@ -85,10 +87,10 @@ export const PrizeTracker = () => {
   const [list, setList] = useState([]);
   const [users, setUsers] = useState([]);
   const today = adelaideToday();
-  const load = useCallback(() => http.get("/admin/prizes").then((r) => setList(r.data)), []);
+  const load = useCallback(() => http.get("/admin/prizes").then((r) => setList(r.data)).catch((e) => toast.error(errMsg(e))), []);
   useEffect(() => {
     load();
-    http.get("/admin/users").then((r) => setUsers(r.data));
+    http.get("/admin/users").then((r) => setUsers(r.data)).catch((e) => toast.error(errMsg(e)));
   }, [load]);
   const collect = async (id) => {
     await http.post(`/admin/prizes/${id}/collected`).catch((e) => toast.error(errMsg(e)));
@@ -120,18 +122,22 @@ export const PrizeTracker = () => {
 };
 
 export const GrantMembershipButton = ({ u, onDone }) => {
+  const [busy, setBusy] = useState(false);
   const grant = async () => {
-    if (!window.confirm(`Record $120 cash and give ${u.name} a year's membership${u.is_subscriber ? " (adds a year to their current one)" : ""}?`)) return;
+    if (busy || !window.confirm(`Record $120 cash and give ${u.name} a year's membership${u.is_subscriber ? " (adds a year to their current one)" : ""}?`)) return;
+    setBusy(true);
     try {
       await http.post(`/admin/users/${u.user_id}/grant-membership`);
       toast.success(`${u.name} now has a year's membership`);
-      onDone();
+      await onDone();
     } catch (e) {
       toast.error(errMsg(e));
+    } finally {
+      setBusy(false);
     }
   };
   return (
-    <button data-testid={`admin-grant-membership-button-${u.user_id}`} onClick={grant} className="btn-blue !min-h-[38px] !px-4 text-sm">
+    <button data-testid={`admin-grant-membership-button-${u.user_id}`} disabled={busy} onClick={grant} className="btn-blue !min-h-[38px] !px-4 text-sm">
       <Users className="h-4 w-4" /> Paid cash · {u.is_subscriber ? "+1 year" : "give year"}
     </button>
   );

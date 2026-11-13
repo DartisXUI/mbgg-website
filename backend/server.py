@@ -450,7 +450,7 @@ async def period_progress(user_id: str, year: int, idx: int) -> dict:
 
 async def award_bonuses(user_id: str) -> None:
     today = local_now().date()
-    periods = [(today.year - 1, 5)] + [(today.year, i) for i in range(6)]
+    periods = [(today.year - 1, i) for i in range(6)] + [(today.year, i) for i in range(6)]
     for year, idx in periods:
         if period_bounds(year, idx)[1] >= today:
             continue
@@ -459,13 +459,14 @@ async def award_bonuses(user_id: str) -> None:
         prog = await period_progress(user_id, year, idx)
         if not prog["qualifies"]:
             continue
+        raffle_year = max(prog["raffle_year"], today.year)
         try:
             await db.raffle_bonuses.insert_one({"id": uuid.uuid4().hex, "user_id": user_id, "year": year, "period": idx,
                                                 "label": prog["label"], "entries": BONUS_ENTRIES,
-                                                "raffle_year": prog["raffle_year"], "created_at": iso(now())})
+                                                "raffle_year": raffle_year, "created_at": iso(now())})
         except DuplicateKeyError:
             continue
-        await assign_raffle_numbers(user_id, prog["raffle_year"], BONUS_ENTRIES, "bonus", f"{year}-{idx}")
+        await assign_raffle_numbers(user_id, raffle_year, BONUS_ENTRIES, "bonus", f"{year}-{idx}")
 
 
 # ---------- Dashboard / check-in ----------
@@ -746,6 +747,10 @@ async def grant_membership(user_id: str, admin: dict = Depends(require_admin)):
 @api.get("/admin/sessions")
 async def session_summary(date: Optional[str] = None, staff: dict = Depends(require_staff)):
     d = date or local_now().date().isoformat()
+    try:
+        Date.fromisoformat(d)
+    except ValueError:
+        raise HTTPException(400, "Invalid date")
     logs = await db.game_logs.find({"played_at": d}, {"_id": 0}).to_list(2000)
     names = {u["user_id"]: u["name"] for u in await db.users.find(
         {"user_id": {"$in": list({lg["user_id"] for lg in logs})}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(2000)}
@@ -785,6 +790,8 @@ async def add_prize(body: PrizeIn, staff: dict = Depends(require_staff)):
         won = Date.fromisoformat(body.won_at) if body.won_at else local_now().date()
     except ValueError:
         raise HTTPException(400, "Invalid date")
+    if won > local_now().date() or won < local_now().date() - timedelta(days=365):
+        raise HTTPException(400, "Win date must be within the last year and not in the future")
     doc = {"id": uuid.uuid4().hex, "user_id": body.user_id, "user_name": u["name"], "prize": body.prize.strip(),
            "event": body.event.strip(), "won_at": won.isoformat(),
            "collect_by": (won + relativedelta(months=3)).isoformat(), "collected": False,
@@ -800,10 +807,10 @@ async def list_prizes(staff: dict = Depends(require_staff)):
 
 @api.post("/admin/prizes/{prize_id}/collected")
 async def collect_prize(prize_id: str, staff: dict = Depends(require_staff)):
-    r = await db.prizes.update_one({"id": prize_id}, {"$set": {"collected": True, "collected_at": iso(now()),
+    r = await db.prizes.update_one({"id": prize_id, "collected": False}, {"$set": {"collected": True, "collected_at": iso(now()),
                                                              "handed_over_by": staff["name"]}})
     if not r.matched_count:
-        raise HTTPException(404, "Prize not found")
+        raise HTTPException(404, "Prize not found or already collected")
     return {"ok": True}
 
 

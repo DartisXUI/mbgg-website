@@ -18,6 +18,10 @@ Choices: Square (AUD), Google + email/password login (no Facebook), one admin wh
 ## Implemented (2026-11-13)
 - All above features; admin seeded (alcock.jacob@gmail.com). Tested iteration_1: backend 26/26, frontend flows pass; fixes applied after (Square email prefill removed, pending link reuse, IP+email login lockout, Adelaide dates, badge refresh, mobile ticker below logo).
 
+## Iteration 2 (2026-11-13)
+- User request: cash membership button (admin), prize pickup tracker (3 months), game log + leaderboards open to every account, 3 free raffle entries for logging every checked-in session in a 2-month block, site name colours (Murray white / Bridge logo blue #12a4f5 / Games Group white), host session summary of games & scores, monthly most-played games.
+- Implemented all; tested iteration_2 (backend 36/36, UI flows pass). Follow-up fixes: bonus backfill of previous-year blocks (late awards go into current year raffle), date validation, prize collect guard, grant button double-click guard, error states.
+
 ## Backlog
 - P1: Square webhook for payments where user never returns; admin manual "paid cash"/grant membership; prize holding tracker (3-month window)
 - P2: push notifications to hosts for token alerts; shadcn date picker; raffle draw tool
