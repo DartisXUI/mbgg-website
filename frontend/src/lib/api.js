@@ -10,6 +10,9 @@ export const errMsg = (e) => {
   return d || e?.message || "Something went wrong";
 };
 
+export const adelaideToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Adelaide" });
+export const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
 export const money = (cents) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
 export async function startCheckout(product, extra = {}) {

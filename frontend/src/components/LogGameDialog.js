@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { http, errMsg } from "@/lib/api";
+import { http, errMsg, adelaideToday } from "@/lib/api";
 import { FAVOURITE_GAMES } from "@/data/games";
 
-const today = () => new Date().toLocaleDateString("en-CA");
+const today = adelaideToday;
 
 const F = ({ id, label, children }) => (
   <div className="space-y-1.5">

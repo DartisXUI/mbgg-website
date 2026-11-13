@@ -192,14 +192,15 @@ async def register(body: RegisterIn, response: Response):
 
 
 @api.post("/auth/login")
-async def login(body: LoginIn, response: Response):
+async def login(body: LoginIn, request: Request, response: Response):
     email = clean_email(body.email)
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
     since = iso(now() - timedelta(minutes=15))
-    if await db.login_attempts.count_documents({"email": email, "at": {"$gte": since}}) >= 5:
+    if await db.login_attempts.count_documents({"email": email, "ip": ip, "at": {"$gte": since}}) >= 5:
         raise HTTPException(429, "Too many attempts. Try again in 15 minutes")
     u = await db.users.find_one({"email": email}, {"_id": 0})
     if not u or not u.get("password_hash") or not check_pw(body.password, u["password_hash"]):
-        await db.login_attempts.insert_one({"email": email, "at": iso(now())})
+        await db.login_attempts.insert_one({"email": email, "ip": ip, "at": iso(now())})
         raise HTTPException(401, "Wrong email or password")
     await db.login_attempts.delete_many({"email": email})
     await create_session(u["user_id"], response)
@@ -305,6 +306,12 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
         meta["year"] = local_now().year
     amount, name = price_for(body)
     base, token, loc = square_cfg()
+    recent = await db.payments.find_one(
+        {"user_id": user["user_id"], "product": body.product, "amount_cents": amount, "status": "PENDING",
+         "checkout_url": {"$exists": True}, "created_at": {"$gte": iso(now() - timedelta(minutes=20))},
+         "meta.date": meta.get("date")}, {"_id": 0}, sort=[("created_at", -1)])
+    if recent and recent["product"] != "raffle":
+        return {"checkout_id": recent["checkout_id"], "checkout_url": recent["checkout_url"]}
     origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
     if not origin.startswith("http"):
         raise HTTPException(400, "Missing origin")
@@ -314,8 +321,7 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
                "quick_pay": {"name": name, "price_money": {"amount": amount, "currency": "AUD"},
                              "location_id": loc},
                "payment_note": f"mbgg:{checkout_id}:{user['email']}",
-               "checkout_options": {"redirect_url": f"{origin}/checkout/complete?checkout_id={checkout_id}"},
-               "pre_populated_data": {"buyer_email": user["email"]}}
+               "checkout_options": {"redirect_url": f"{origin}/checkout/complete?checkout_id={checkout_id}"}}
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(f"{base}/v2/online-checkout/payment-links", headers=sq_headers(token), json=payload)
     if r.status_code >= 400:
@@ -325,7 +331,8 @@ async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depen
     await db.payments.insert_one({"checkout_id": checkout_id, "user_id": user["user_id"], "product": body.product,
                                   "label": name, "amount_cents": amount, "currency": "AUD", "status": "PENDING",
                                   "meta": meta, "square_order_id": link["order_id"],
-                                  "square_link_id": link["id"], "created_at": iso(now())})
+                                  "square_link_id": link["id"], "checkout_url": link["url"],
+                                  "created_at": iso(now())})
     return {"checkout_id": checkout_id, "checkout_url": link["url"]}
 
 

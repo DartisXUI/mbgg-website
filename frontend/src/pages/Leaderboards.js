@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { http } from "@/lib/api";
+import { http, plural } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Loader } from "@/components/ProtectedRoute";
 import { HonorNote, SubscriberGate } from "@/components/SubscriberGate";
@@ -13,7 +13,7 @@ const METRICS = [
   { key: "podiums", label: "Podiums (top 3)", fmt: (r) => r.podiums, sort: (a, b) => b.podiums - a.podiums },
   { key: "win_rate", label: "Win rate", fmt: (r) => `${r.win_rate}%`, sort: (a, b) => b.win_rate - a.win_rate || b.games - a.games, min: 3 },
   { key: "playtime_min", label: "Playtime", fmt: (r) => `${(r.playtime_min / 60).toFixed(1)}h`, sort: (a, b) => b.playtime_min - a.playtime_min },
-  { key: "games", label: "Most played", fmt: (r) => `${r.games} plays`, sort: (a, b) => b.games - a.games },
+  { key: "games", label: "Most played", fmt: (r) => plural(r.games, "play"), sort: (a, b) => b.games - a.games },
 ];
 const MEDAL = ["text-mb-orange", "text-slate-200", "text-[#cd7f32]"];
 
@@ -29,7 +29,7 @@ const Board = ({ rows, metric, me }) => {
           <span className={`w-8 font-display text-2xl font-black ${MEDAL[i] || "text-slate-500"}`}>{i + 1}</span>
           <img src={r.picture || "/brand/round.png"} alt="" className="h-9 w-9 rounded-full object-cover" />
           <span className="flex-1 truncate font-semibold">{r.name}</span>
-          <span className="hidden text-xs text-slate-500 sm:inline">{r.games} plays · {r.wins} wins</span>
+          <span className="hidden text-xs text-slate-500 sm:inline">{plural(r.games, "play")} · {plural(r.wins, "win")}</span>
           <span className="font-mono-x text-lg text-white">{m.fmt(r)}</span>
         </Link>
       ))}

@@ -25,7 +25,11 @@ const useStaffAlerts = (user) => {
     const load = () => http.get("/admin/summary").then((r) => setCount(r.data.unacked_tokens)).catch(() => {});
     load();
     const t = setInterval(load, 30000);
-    return () => clearInterval(t);
+    window.addEventListener("mbgg-alerts", load);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("mbgg-alerts", load);
+    };
   }, [user]);
   return count;
 };

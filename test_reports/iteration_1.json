@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 1 full-stack test of MBGG PWA. Backend: 26/26 pytest pass (auth, roles, subscriber gating, free check-in, monthly token + ack, game logs validation/grouping/delete, leaderboards metrics incl. win-rate, collections, public members, payments link creation for all 8 products, PWA assets). Frontend: registration/login/logout, nonsub gates, subscriber check-in, token use, game log dialog + per-game tabs + delete, leaderboards game/metric tabs (win rate min 3 enforced), collections add/delete (digital requires platform), public profile logged-out, members search, admin Host nav/badge/tabs/ack/promote+demote, Square navigation for check-in/raffle/donation/annual/gate subscribe, checkout-complete pending view, rails at 1920 + ticker/mobile menu at 390 all working. No payments were completed. One real backend bug found: Square rejects some buyer emails and the whole checkout fails.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/payments/checkout", "issue": "pre_populated_data.buyer_email is always sent. Square production rejects emails it considers invalid (e.g. any @example.com address) with INVALID_EMAIL_ADDRESS, so the endpoint returns 400 'Square couldn't start the checkout' and that user can't pay for anything. Fix: on an INVALID_EMAIL_ADDRESS error, retry without pre_populated_data, or leave buyer_email out entirely. Reproduced with TEST_x@example.com (400); TEST_x@gmail.com works (200)."},
+      {"endpoint": "POST /api/payments/checkout", "issue": "Every click makes a new Square payment link and a new PENDING record (two annual clicks = two links). Consider reusing a recent PENDING link for the same user+product."},
+      {"endpoint": "POST /api/auth/login", "issue": "The rate limit is per email only (5 failed attempts per 15 min), so anyone can lock out the admin account by entering wrong passwords. Consider limiting by IP + email."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin CheckinRoster", "issue": "The default date uses the browser's local timezone (new Date().toLocaleDateString('en-CA')) but check-ins are stored with Adelaide dates. Reproduced: at 01:27 Adelaide time (UTC browser) the roster defaulted to 2026-11-13 and showed '0 checked in', while today's check-in was stored as 2026-11-14. Use toLocaleDateString('en-CA', {timeZone: 'Australia/Adelaide'}).", "selector": "[data-testid=admin-checkin-date-input]", "priority": "MEDIUM"},
+      {"component": "LogGameDialog", "issue": "The default played_at date and the date input's max also use the browser's local date instead of Adelaide. Logs get yesterday's date (UTC), and users in timezones ahead of Adelaide can pick a date the backend rejects.", "selector": "[data-testid=log-date-input]", "priority": "LOW"},
+      {"component": "Nav admin badge", "issue": "After clicking 'Got it' on a token alert, nav-admin-alert-count still shows 1 until the next 30s poll. Refresh the summary right after ack.", "selector": "[data-testid=nav-admin-alert-count]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile (390px) layout", "issues": ["game-rail-ticker is drawn above widescreen-logo-header, so the widescreen logo is not at the top of the page on mobile/tablet. Move the ticker below the header."]},
+      {"screen": "Game log dialog / Admin check-ins", "issues": ["Uses the browser's native <input type=date> instead of the shadcn Calendar/Popover date picker"]},
+      {"screen": "Leaderboards", "issues": ["Pluralisation: '1 plays · 1 wins' / '0 wins'"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_mbgg_api.py", "/app/backend/tests/conftest.py", "/app/backend/tests/ui_fixtures.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Handle Square INVALID_EMAIL_ADDRESS in create_checkout: retry without pre_populated_data.buyer_email, or drop it",
+    "Use the Australia/Adelaide date for the admin check-in roster default and for the LogGameDialog default/max date",
+    "Refresh the nav admin alert count right after a token ack",
+    "Move the mobile game-rail-ticker below the widescreen logo header",
+    "Optional: replace native date inputs with the shadcn Calendar; fix plural labels; IP-based login rate limit"
+  ],
+  "critical_code_review_comments": [
+    "server.py create_checkout: buyer_email pre-population makes checkout fragile (see backend minor issue)",
+    "server.py login: the per-email lockout can be abused to DoS the admin login",
+    "Leaderboard win-rate minimum (3 plays) is only enforced in the frontend; the API returns win_rate for every row, which is fine but should be documented",
+    "Frontend date defaults (Admin.js line 46, LogGameDialog.js today()) ignore the Adelaide timezone the backend uses",
+    "/api/members is public and returns every user (no pagination, limit 1000); email is correctly excluded"
+  ],
+  "updated_files": ["/app/backend/tests/test_mbgg_api.py", "/app/backend/tests/conftest.py", "/app/backend/tests/ui_fixtures.py"],
+  "success_rate": {"backend": "100% (26/26) - one robustness bug found while testing (Square email)", "frontend": "~95% - every flow worked; timezone default bug in the admin roster"},
+  "seed_data_creation": "TEST_ users (gmail.com domain for payment tests) created via the API with subscription_expires_at set in Mongo. All were deleted afterwards by user_id together with their sessions/logs/checkins/tokens/collections/payments; PENDING Square payment links were deleted through the Square API. One PENDING donation_5 payment (checkout_id ba667c1917464b14a5d12488b694af63, user_7398ea74a335, user no longer exists) was there BEFORE this run, probably from the main agent's own testing. It was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/ (xdist -n 2 loadscope). conftest auto-cleans created users and deletes their Square links. Payment tests must use non-example.com emails (register_user(domain='gmail.com')) until the buyer_email bug is fixed. Once it is fixed, switch the payments tests back to example.com to verify. ui_fixtures.py setup/cleanup creates 2 subscribers, 1 nonsub, 1 host candidate for UI runs (writes /tmp/ui_users.json). Square keys are LIVE: never complete a payment.",
+  "test_credentials": "Admin alcock.jacob@gmail.com / MBGG-Host-Admin-2026 works (from /app/memory/test_credentials.md). /app/auth_testing.md does NOT exist; subscribers were simulated by setting subscription_expires_at in Mongo directly."
+}

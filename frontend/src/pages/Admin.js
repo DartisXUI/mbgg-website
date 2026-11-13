@@ -3,7 +3,7 @@ import { BadgeCheck, Check, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { http, errMsg } from "@/lib/api";
+import { http, errMsg, adelaideToday } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const when = (s) => new Date(s).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
@@ -18,6 +18,7 @@ const TokenAlerts = () => {
   }, [load]);
   const ack = async (id) => {
     await http.post(`/admin/token-alerts/${id}/ack`).catch((e) => toast.error(errMsg(e)));
+    window.dispatchEvent(new Event("mbgg-alerts"));
     load();
   };
   return (
@@ -43,7 +44,7 @@ const TokenAlerts = () => {
 };
 
 const CheckinRoster = () => {
-  const [date, setDate] = useState(new Date().toLocaleDateString("en-CA"));
+  const [date, setDate] = useState(adelaideToday());
   const [data, setData] = useState(null);
   useEffect(() => {
     http.get("/admin/checkins", { params: { date } }).then((r) => setData(r.data));
