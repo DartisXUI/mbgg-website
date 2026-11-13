@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 5 retest of the iteration 4 failures. Testing ran at 02:40 Sat 14 Nov 2026 Adelaide time, so current_slot was ('2026-11-13', 'evening'). This is the after-midnight case the fixes target. Backend: 62/62 tests pass (QuarterlyTest deselected). That includes the 3 tests that failed before plus a new one: the running session's date is not listed in /me/reminders or in dashboard unlogged_dates. checkins_today, the /admin/sessions default date and the POST /api/logs played_at default all use the session date (2026-11-13). One old test (iteration2 TestRaffleBonus current_progress) failed because the test itself seeded a check-in on the calendar date and then logged without played_at. I fixed the test by passing played_at explicitly; the app behaviour is correct. Frontend: all checks pass. The landing drink perk text is exactly as specified and no '1 x drink' text remains. A non-subscriber who paid for the day session sees 'Check in free', and the toast reads 'Checked in free – you already paid today'. No reminder banner appears for the running session. The Game Log dialog date defaults to 2026-11-13. Admin Check-ins shows Day '1 PERSON', Evening '1 PERSON' and the label 'Free · paid earlier today'. The Session summary tab defaults to 2026-11-13 and shows Checked in = 2.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin Check-ins header", "issue": "admin-checkin-count hard-codes 'people' (Admin.js line 64: `{data?.headcount || 0} people`), so a headcount of 1 shows '1 PEOPLE'. Use plural(...).replace('persons','people') as the per-session counts do.", "selector": "[data-testid='admin-checkin-count']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Check-ins / Session summary", "issues": ["The date filters are still native <input type=date> (browser picker), not the shadcn Calendar"]},
+      {"screen": "Copy consistency", "issues": ["The landing perk says the free drink/snack applies only 'during special member-wide free admission sessions', but the subscriber check-in toast says 'Checked in! Grab your free drink & snack.' and iteration 4 saw the panel note 'A free drink and snack included'. Confirm the intended wording."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration4_sessions.py", "/app/backend/tests/test_iteration2_features.py", "/app/test_reports/pytest/iter5.xml"],
+  "action_items": [
+    "Pluralise the admin-checkin-count header ('1 person')",
+    "Optional: line up the subscriber check-in toast/panel text with the new 'special sessions only' drink perk wording"
+  ],
+  "critical_code_review_comments": [
+    "The session-date fixes are consistent across admin_summary, session_summary, create_log and unlogged_checkins, and the frontend sessionDate() matches (hour<5 means the previous day).",
+    "Session summary 'Checked in' counts check-in rows, so one person attending both sessions counts as 2. This is likely intended; label it if not.",
+    "The dashboard still returns both today (session date) and today_date (calendar date). Fine, but easy to confuse."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration2_features.py", "/app/backend/tests/test_iteration4_sessions.py"],
+  "success_rate": {"backend": "100% (62/62)", "frontend": "100% of the requested checks (1 low-priority pluralisation issue found in code review)"},
+  "test_credentials": "Admin alcock.jacob@gmail.com / MBGG-Host-Admin-2026 worked",
+  "seed_data_creation": "TEST_ users only (pytest fixtures plus ui_fixtures.py), with their data removed afterwards. 0 TEST_ users remain, 0 orphan check-ins and no TEST_ login_attempts. Nothing was paid on Square and Square requests were blocked in Playwright. quarter_awards was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/ -n 0 --deselect tests/test_iteration3_features.py::TestQuarterly. UI: python3 tests/ui_fixtures.py setup && python3 tests/ui_seed_iter4.py, then ui_fixtures.py cleanup. This iteration ran after midnight (02:40 Adelaide); daytime runs should also pass."
+}

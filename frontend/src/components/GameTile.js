@@ -8,6 +8,18 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 export const GameTile = ({ game, index, compact = false }) => {
   const accent = ACCENTS[index % ACCENTS.length];
   const Icon = ICONS[game.kind];
+  const art = game.imgs ? game.imgs[index % game.imgs.length] : game.img;
+  if (art) {
+    return (
+      <div
+        data-testid={`rail-tile-${slug(game.name)}`}
+        title={game.name}
+        className={`rail-tile flex items-center justify-center ${compact ? "h-32 w-44 shrink-0" : "h-32"}`}
+      >
+        <img src={art} alt={game.name} loading="lazy" className="max-h-full max-w-full object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.6)]" />
+      </div>
+    );
+  }
   return (
     <div
       data-testid={`rail-tile-${slug(game.name)}`}

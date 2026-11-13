@@ -61,7 +61,7 @@ const CheckinRoster = () => {
     <div className="space-y-4">
       <Input data-testid="admin-checkin-date-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11 w-48 bg-[#121826]" />
       <div className="panel !p-0">
-        <div data-testid="admin-checkin-count" className="border-b border-white/10 px-5 py-3 font-display text-xl font-bold uppercase">{data?.headcount || 0} people · {data?.rows.length || 0} check-ins</div>
+        <div data-testid="admin-checkin-count" className="border-b border-white/10 px-5 py-3 font-display text-xl font-bold uppercase">{plural(data?.headcount || 0, "person").replace("persons", "people")} · {plural(data?.rows.length || 0, "check-in")}</div>
         {data && Object.entries(data.session_labels).map(([key, label]) => (
           <div key={key} data-testid={`admin-checkin-session-${key}`}>
             <div className="flex justify-between bg-white/[0.03] px-5 py-2 text-xs uppercase tracking-widest text-slate-400">

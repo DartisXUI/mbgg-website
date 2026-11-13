@@ -187,3 +187,12 @@ class TestDedupe:
         assert r.status_code == 200
         assert r.json()["played_at"] == SLOT_DATE
         assert SLOT_DATE not in s.get(f"{BASE_URL}/api/me/reminders").json()["unlogged_dates"]
+
+
+    def test_current_session_not_in_reminders_before_logging(self):
+        # iteration 5: the running session's date must not show in the unlogged reminder / dashboard
+        s, u, _ = register_user("cur5", subscriber=True, domain="gmail.com")
+        assert s.post(f"{BASE_URL}/api/checkin", json={}).status_code == 200
+        assert SLOT_DATE not in s.get(f"{BASE_URL}/api/me/reminders").json()["unlogged_dates"]
+        d = s.get(f"{BASE_URL}/api/me/dashboard").json()
+        assert d["today"] == SLOT_DATE and SLOT_DATE not in d["unlogged_dates"]

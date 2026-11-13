@@ -150,7 +150,7 @@ class TestRaffleBonus:
         assert cur["period"] == (t.month - 1) // 2 and cur["sessions"] == 1 and cur["logged_sessions"] == 0
         assert cur["missing_dates"] == [t.isoformat()] and cur["qualifies"] is False
         assert cur["raffle_year"] == (t.year + 1 if cur["period"] == 5 else t.year)
-        assert s.post(f"{BASE_URL}/api/logs", json=log_body("TEST_Cur bonus")).status_code == 200
+        assert s.post(f"{BASE_URL}/api/logs", json=log_body("TEST_Cur bonus", played_at=t.isoformat())).status_code == 200
         cur = s.get(f"{BASE_URL}/api/me/dashboard").json()["bonus"]["current"]
         assert cur["qualifies"] is True and cur["missing_dates"] == []
         assert d["bonus"]["awarded"] == []  # current block not ended -> no award
