@@ -1,5 +1,5 @@
 export const FAVOURITE_GAMES = [
-  { name: "Flip 7", sub: "With a Vengeance · Custom Combo Deck", kind: "card", imgs: ["/games/flip7.webp", "/games/flip7-v.webp"] },
+  { name: "Flip 7", sub: "With a Vengeance · Custom Combo Deck", kind: "card", q: "flip 7", imgs: ["/games/flip7.webp", "/games/flip7-v.webp"] },
   { name: "Love Letter", sub: "", kind: "card", img: "/games/ll.webp" },
   { name: "Tacta", sub: "", kind: "board", img: "/games/tacta.webp" },
   { name: "Star Realms", sub: "", kind: "card", img: "/games/sr.webp" },
@@ -7,18 +7,18 @@ export const FAVOURITE_GAMES = [
   { name: "Project L", sub: "All In KSE", kind: "board", img: "/games/pl-kse.webp?v=2" },
   { name: "Dominion", sub: "", kind: "card", img: "/games/dominion.webp" },
   { name: "Nexus Ops", sub: "Renegade Studios", kind: "board", img: "/games/nops.webp" },
-  { name: "King of Tokyo", sub: "Godzilla · New York · Monster Island + expansions", kind: "board", imgs: ["/games/kot-g.webp", "/games/kot-mb.webp", "/games/komi.webp"] },
-  { name: "Soloverse", sub: "Our very own printed game", kind: "original", logo: "/brand/soloverse.png" },
+  { name: "King of Tokyo", sub: "Godzilla · New York · Monster Island + expansions", kind: "board", q: "king of", imgs: ["/games/kot-g.webp", "/games/kot-mb.webp", "/games/komi.webp"] },
+  { name: "Soloverse", sub: "Our very own printed game", kind: "original", img: "/games/soloverse.webp" },
   { name: "Castles of Caleira", sub: "", kind: "board", img: "/games/coc.webp" },
   { name: "Ticket to Ride", sub: "", kind: "board", img: "/games/tor.webp" },
   { name: "Catan", sub: "", kind: "board", img: "/games/catan.webp" },
   { name: "Stardew Valley", sub: "", kind: "digital", img: "/games/sv.webp" },
   { name: "Survive the Island", sub: "Monster Pack · BFF", kind: "board", img: "/games/sti.webp" },
-  { name: "Jackbox Party Packs", sub: "", kind: "digital", img: "/games/jackbox.webp" },
+  { name: "Jackbox Party Packs", sub: "", kind: "digital", q: "jackbox", img: "/games/jackbox.webp" },
   { name: "12 Rivers", sub: "", kind: "board", img: "/games/12r.webp" },
-  { name: "Splendor", sub: "Marvel Splendor", kind: "board", img: "/games/ms.webp" },
+  { name: "Splendor", sub: "Marvel Splendor", kind: "board", q: "splendor", img: "/games/ms.webp" },
   { name: "Brawlhalla", sub: "", kind: "digital", img: "/games/brawlhalla.webp" },
-  { name: "Super Smash Bros. Ultimate", sub: "", kind: "digital", img: "/games/ssbrosu.webp" },
+  { name: "Super Smash Bros. Ultimate", sub: "", kind: "digital", q: "smash", img: "/games/ssbrosu.webp" },
 ];
 
 export const KIND_LABEL = { card: "Card game", board: "Board game", digital: "Video game", original: "Group original" };

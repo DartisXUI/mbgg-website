@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import uuid
 from contextlib import suppress
 from datetime import date as Date, datetime, timezone, timedelta
@@ -15,7 +16,7 @@ from dateutil.relativedelta import relativedelta
 import bcrypt
 import httpx
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel, ReturnDocument
@@ -1021,6 +1022,31 @@ async def monthly_top_games(user: dict = Depends(get_current_user)):
     return [{"month": m, "total_plays": sum(g["plays"] for g in gs), "distinct_games": len(gs),
              "top": sorted(gs, key=lambda g: (-g["plays"], -g["players"]))[:5]}
             for m, gs in sorted(months.items(), reverse=True)]
+
+
+@api.get("/games/details")
+async def game_details(q: str = Query(min_length=2, max_length=60)):
+    rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+    cutoff = (local_now().date() - timedelta(days=365)).isoformat()
+    items = await db.collections.find({"title": rx}, {"_id": 0}).to_list(500)
+    logs = await db.game_logs.find({"title": rx, "played_at": {"$gte": cutoff}}, {"_id": 0}).sort(
+        [("played_at", -1), ("created_at", -1)]).to_list(1000)
+    ids = list({i["user_id"] for i in items} | {lg["user_id"] for lg in logs})
+    users = {u["user_id"]: u for u in await db.users.find({"user_id": {"$in": ids}}, {"_id": 0}).to_list(1000)}
+    owners: dict = {}
+    for i in items:
+        u = users.get(i["user_id"])
+        if not u:
+            continue
+        o = owners.setdefault(i["user_id"], {"user_id": i["user_id"], "name": u["name"], "picture": u.get("picture"),
+                                             "copies": []})
+        o["copies"].append({"title": i["title"], "category": i["category"], "platform": i.get("platform", "")})
+    recent = [{"id": lg["id"], "user_id": lg["user_id"], "name": users.get(lg["user_id"], {}).get("name", "Player"),
+               "title": lg["title"], "score": lg["score"], "placement": lg["placement"],
+               "player_count": lg["player_count"], "played_at": lg["played_at"]} for lg in logs[:10]]
+    return {"owners": sorted(owners.values(), key=lambda o: o["name"].lower()), "recent": recent,
+            "stats": {"plays": len(logs), "players": len({lg["user_id"] for lg in logs}),
+                      "top_score": max((lg["score"] for lg in logs), default=None)}}
 
 
 @api.get("/")
