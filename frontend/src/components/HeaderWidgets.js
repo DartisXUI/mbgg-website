@@ -27,7 +27,7 @@ export const useStaffAlerts = (user) => {
         const last = sessionStorage.getItem(TOASTED_KEY) || seen;
         data.new_checkins
           .filter((c) => c.created_at > last)
-          .forEach((c) => toast.info(`${c.name} checked in · ${c.session === "evening" ? "4pm–late" : "10am–2pm"}${c.family_count ? ` + ${c.family_count} under 15` : ""}`, { id: c.id }));
+          .forEach((c) => toast.info(`${c.name} checked in · ${c.via === "guild" ? "Guild meet-up" : c.session === "evening" ? "4pm–late" : "10am–2pm"}${c.family_count ? ` + ${c.family_count} free guest${c.family_count === 1 ? "" : "s"}` : ""}`, { id: c.id }));
         if (data.new_checkins.length) sessionStorage.setItem(TOASTED_KEY, data.new_checkins.at(-1).created_at);
         setCount(data.unacked_tokens + data.new_checkins.length);
       } catch {

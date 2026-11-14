@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { http, money } from "@/lib/api";
 import { Loader } from "@/components/ProtectedRoute";
 import { CheckInCard } from "@/components/account/CheckInPanel";
-import { FamilyCard } from "@/components/account/FamilyCard";
+import { FamilyCard, SupportCard } from "@/components/account/FamilyCard";
+import { GuildCheckInCard } from "@/components/account/GuildCheckInCard";
 import { MembershipCard } from "@/components/account/MembershipCard";
 import { TokenCard } from "@/components/account/TokenCard";
 import { DonateCard, RaffleCard } from "@/components/account/MoneyCards";
@@ -19,7 +20,7 @@ const History = ({ data }) => (
         <h4 className="font-display text-lg font-bold uppercase">Recent check-ins</h4>
         <ul className="mt-2 space-y-1 text-sm text-slate-300">
           {data.recent_checkins.length ? data.recent_checkins.map((c) => (
-            <li key={c.id} className="flex justify-between"><span>{c.date} · {c.session === "evening" ? "4pm–late" : "10am–2pm"}</span><span className="text-slate-500">{{ subscription: "Member", staff: "Host/admin", paid: "Paid $5", paid_earlier: "Free (paid earlier)" }[c.via]}</span></li>
+            <li key={c.id} className="flex justify-between"><span>{c.date} · {c.via === "guild" ? `Guild · ${c.guild_name}` : c.session === "evening" ? "4pm–late" : "10am–2pm"}</span><span className="text-slate-500">{{ subscription: "Member", staff: "Host/admin", paid: "Paid $5", paid_earlier: "Free (paid earlier)", guild: "Free" }[c.via]}</span></li>
           )) : <li className="text-slate-500">None yet</li>}
         </ul>
       </div>
@@ -55,8 +56,10 @@ export default function Account() {
       </div>
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <CheckInCard data={data} reload={load} />
+        <GuildCheckInCard data={data} reload={load} />
         <MembershipCard data={data} />
         <FamilyCard data={data} reload={load} />
+        <SupportCard data={data} reload={load} />
         <TokenCard data={data} reload={load} />
         <BonusCard data={data} />
         <RaffleCard data={data} />

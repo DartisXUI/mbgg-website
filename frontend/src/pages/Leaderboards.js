@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Loader } from "@/components/ProtectedRoute";
 import { HonorNote } from "@/components/SubscriberGate";
 import { MonthlyTopGames } from "@/components/MonthlyTopGames";
+import { GuildBoard } from "@/components/GuildBoard";
 import { QuarterlyPrize } from "@/components/QuarterlyPrize";
 
 const METRICS = [
@@ -45,6 +46,7 @@ export default function Leaderboards() {
   const [game, setGame] = useState("all");
   const [metric, setMetric] = useState("total_score");
   const [data, setData] = useState(null);
+  const [view, setView] = useState("players");
   useEffect(() => {
     http.get("/leaderboards", { params: game === "all" ? {} : { game } }).then((r) => setData(r.data));
   }, [game]);
@@ -56,6 +58,13 @@ export default function Leaderboards() {
         <h1 className="font-display text-4xl font-black uppercase sm:text-5xl split-title"><span className="r">Leader</span><span className="b">boards</span></h1>
       </div>
       <HonorNote />
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList className="bg-[#121826]">
+          <TabsTrigger value="players" data-testid="leaderboard-view-players">Players</TabsTrigger>
+          <TabsTrigger value="guilds" data-testid="leaderboard-view-guilds">Guilds</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {view === "guilds" ? <GuildBoard /> : <>
       <QuarterlyPrize />
       <div>
         <div className="eyebrow mb-2">Game</div>
@@ -76,6 +85,7 @@ export default function Leaderboards() {
       </div>
       <Board rows={data.rows} metric={metric} me={user.user_id} />
       <MonthlyTopGames />
+      </>}
     </div>
   );
 }

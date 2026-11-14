@@ -4,17 +4,24 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { http, errMsg, money, startCheckout } from "@/lib/api";
 
-const under15 = (f) => new Date().getFullYear() - f.birth_year <= 14;
+const under15 = (f) => (f.kind || "child") !== "child" || new Date().getFullYear() - f.birth_year <= 14;
 
-const KidPicker = ({ kids, picked, toggle }) => (
-  <div data-testid="checkin-family-picker" className="mt-4 space-y-2">
-    <div className="eyebrow">Family under 15 with you · free</div>
-    {kids.map((k) => (
+const Group = ({ title, list, picked, toggle }) => list.length > 0 && (
+  <>
+    <div className="eyebrow">{title}</div>
+    {list.map((k) => (
       <label key={k.id} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-[#0B0F19]/60 px-3">
         <Checkbox data-testid={`checkin-family-${k.id}`} checked={picked.includes(k.id)} onCheckedChange={() => toggle(k.id)} />
         <span className="font-semibold">{k.name}</span>
       </label>
     ))}
+  </>
+);
+
+const KidPicker = ({ kids, picked, toggle }) => (
+  <div data-testid="checkin-family-picker" className="mt-4 space-y-2">
+    <Group title="Family under 15 with you · free" list={kids.filter((k) => (k.kind || "child") === "child")} picked={picked} toggle={toggle} />
+    <Group title="Support workers with you · free" list={kids.filter((k) => k.kind === "support")} picked={picked} toggle={toggle} />
   </div>
 );
 
@@ -47,9 +54,9 @@ export const CheckInCard = ({ data, reload }) => {
     }
     run(() => http.post("/checkin", { family_ids: picked }), u.is_subscriber ? "Checked in! Grab your free drink & snack." : data.free_entry ? "Checked in with free host admission" : "Checked in free – you already paid today");
   };
-  const addKids = () => run(() => http.post("/checkin/family", { family_ids: picked }), "Family checked in free");
+  const addKids = () => run(() => http.post("/checkin/family", { family_ids: picked }), "Guests checked in free");
   const note = u.is_subscriber ? "Members are not required to pay the admission while subscribed, plus a free drink and snack." : data.free_entry ? "Hosts & admins get free admission." : data.second_session_free ? "You paid for the day session, so this evening session is free." : `Tap to pay the ${money(500)} admission and you're on the list. Paying for the day session makes the evening session free.`;
-  const label = free ? `Check in free${picked.length ? ` + ${picked.length} under 15` : ""}` : `Check in & pay $5${picked.length ? ` + ${picked.length} free under 15` : ""}`;
+  const label = free ? `Check in free${picked.length ? ` + ${picked.length} free guest${picked.length === 1 ? "" : "s"}` : ""}` : `Check in & pay $5${picked.length ? ` + ${picked.length} free guest${picked.length === 1 ? "" : "s"}` : ""}`;
 
   return (
     <div data-testid="checkin-card" className="panel panel-red">
@@ -72,7 +79,7 @@ export const CheckInCard = ({ data, reload }) => {
           {kids.length > 0 && (
             <>
               <KidPicker kids={kids} picked={picked} toggle={toggle} />
-              <button data-testid="checkin-family-button" disabled={busy || !picked.length} onClick={addKids} className="btn-ghost mt-3 w-full">Check in selected kids (free)</button>
+              <button data-testid="checkin-family-button" disabled={busy || !picked.length} onClick={addKids} className="btn-ghost mt-3 w-full">Check in selected guests (free)</button>
             </>
           )}
         </>

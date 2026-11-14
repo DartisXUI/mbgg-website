@@ -127,9 +127,9 @@ def eligible_family(u: dict, ids: list[str]) -> list[dict]:
         f = fam.get(i)
         if not f:
             raise HTTPException(400, "Unknown family member")
-        if local_now().year - f["birth_year"] > 14:
+        if f.get("kind", "child") == "child" and local_now().year - f["birth_year"] > 14:
             raise HTTPException(400, f"{f['name']} is 15 or older and needs their own account")
-        out.append({"id": f["id"], "name": f["name"]})
+        out.append({"id": f["id"], "name": f["name"], "kind": f.get("kind", "child")})
     return out
 
 
@@ -523,7 +523,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
                     else iso(now() - timedelta(days=365)))
     start_date = parse_dt(period_start).astimezone(TZ).date().isoformat()
     checkins = await db.checkins.find({"user_id": user["user_id"]}, {"_id": 0}).sort("date", -1).to_list(400)
-    in_period = [c for c in checkins if c["date"] >= start_date]
+    in_period = [c for c in checkins if c["date"] >= start_date and c.get("via") != "guild"]
     token = await db.token_uses.find_one({"user_id": user["user_id"], "month": month}, {"_id": 0})
     raffle = await db.raffle_entries.find({"user_id": user["user_id"], "year": local_now().year},
                                           {"_id": 0}).sort("number", 1).to_list(500)
@@ -546,6 +546,8 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "raffle_entry_cents": RAFFLE_CENTS, "bonus": {"current": bonus_now, "awarded": bonuses,
                                                       "entries": BONUS_ENTRIES},
             "prizes": prizes, "today_date": ld.isoformat(),
+            "guilds": await db.guilds.find({"id": {"$in": user.get("guild_ids", [])}}, {"_id": 0}).sort("name", 1).to_list(50),
+            "guild_checkins_today": [c["guild_id"] for c in checkins if c["date"] == slot_date and c.get("via") == "guild"],
             "payments": [payment_view(p) for p in payments]}
 
 
@@ -566,18 +568,20 @@ async def reminders(user: dict = Depends(get_current_user)):
 
 class FamilyIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    birth_year: int
+    kind: Literal["child", "support"] = "child"
+    birth_year: Optional[int] = None
 
 
 @api.post("/me/family")
 async def add_family(body: FamilyIn, user: dict = Depends(get_current_user)):
     if not body.name.strip():
         raise HTTPException(400, "Enter a name")
-    if not 0 <= local_now().year - body.birth_year <= 14:
+    if body.kind == "child" and (body.birth_year is None or not 0 <= local_now().year - body.birth_year <= 14):
         raise HTTPException(400, "Family members listed here must be under 15")
-    if len(user.get("family", [])) >= 10:
-        raise HTTPException(400, "Up to 10 family members")
-    f = {"id": uuid.uuid4().hex[:12], "name": body.name.strip(), "birth_year": body.birth_year}
+    if sum(1 for f in user.get("family", []) if f.get("kind", "child") == body.kind) >= 10:
+        raise HTTPException(400, "Up to 10 people of each type")
+    f = {"id": uuid.uuid4().hex[:12], "name": body.name.strip(), "kind": body.kind,
+         "birth_year": body.birth_year if body.kind == "child" else None}
     await db.users.update_one({"user_id": user["user_id"]}, {"$push": {"family": f}})
     return f
 
@@ -744,6 +748,105 @@ async def leaderboards(game: Optional[str] = None, user: dict = Depends(get_curr
             "rows": out}
 
 
+# ---------- Guilds (membership mirrors the group's Discord; managed by hosts/admins) ----------
+class GuildIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    tag: str = Field(min_length=1, max_length=12)
+
+
+class GuildMemberIn(BaseModel):
+    user_id: str
+
+
+class GuildCheckinIn(BaseModel):
+    guild_id: str
+    family_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+@api.get("/guilds")
+async def list_guilds():
+    guilds = await db.guilds.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    users = await db.users.find({"guild_ids": {"$exists": True, "$ne": []}},
+                                {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "guild_ids": 1}).to_list(2000)
+    return [g | {"members": [{"user_id": u["user_id"], "name": u["name"], "picture": u.get("picture")}
+                             for u in users if g["id"] in u.get("guild_ids", [])]} for g in guilds]
+
+
+@api.post("/admin/guilds")
+async def create_guild(body: GuildIn, staff: dict = Depends(require_staff)):
+    if not body.name.strip() or not body.tag.strip():
+        raise HTTPException(400, "Enter a guild name and ID")
+    tag = body.tag.strip().upper()
+    if await db.guilds.find_one({"tag": tag}, {"_id": 1}):
+        raise HTTPException(409, "That guild ID is already used")
+    g = {"id": uuid.uuid4().hex[:12], "name": body.name.strip(), "tag": tag, "created_at": iso(now())}
+    await db.guilds.insert_one(dict(g))
+    return g
+
+
+@api.delete("/admin/guilds/{gid}")
+async def delete_guild(gid: str, admin: dict = Depends(require_admin)):
+    r = await db.guilds.delete_one({"id": gid})
+    if not r.deleted_count:
+        raise HTTPException(404, "Guild not found")
+    await db.users.update_many({}, {"$pull": {"guild_ids": gid}})
+    return {"ok": True}
+
+
+@api.post("/admin/guilds/{gid}/members")
+async def add_guild_member(gid: str, body: GuildMemberIn, staff: dict = Depends(require_staff)):
+    if not await db.guilds.find_one({"id": gid}, {"_id": 1}):
+        raise HTTPException(404, "Guild not found")
+    r = await db.users.update_one({"user_id": body.user_id}, {"$addToSet": {"guild_ids": gid}})
+    if not r.matched_count:
+        raise HTTPException(404, "User not found")
+    return {"ok": True}
+
+
+@api.delete("/admin/guilds/{gid}/members/{user_id}")
+async def remove_guild_member(gid: str, user_id: str, staff: dict = Depends(require_staff)):
+    await db.users.update_one({"user_id": user_id}, {"$pull": {"guild_ids": gid}})
+    return {"ok": True}
+
+
+@api.post("/checkin/guild")
+async def guild_checkin(body: GuildCheckinIn, user: dict = Depends(get_current_user)):
+    g = await db.guilds.find_one({"id": body.guild_id}, {"_id": 0})
+    if not g:
+        raise HTTPException(404, "Guild not found")
+    if body.guild_id not in user.get("guild_ids", []):
+        raise HTTPException(403, "Only members of this guild can check in to its meet-ups")
+    d, _ = current_slot()
+    doc = {"id": uuid.uuid4().hex, "user_id": user["user_id"], "date": d, "session": f"guild:{g['id']}",
+           "via": "guild", "guild_id": g["id"], "guild_name": g["name"],
+           "family": eligible_family(user, body.family_ids), "created_at": iso(now())}
+    try:
+        await db.checkins.insert_one(doc)
+    except DuplicateKeyError:
+        raise HTTPException(400, f"You're already checked in to today's {g['name']} meet-up")
+    return {"ok": True, "date": d, "guild": g["name"]}
+
+
+@api.get("/leaderboards/guilds")
+async def guild_leaderboard(user: dict = Depends(get_current_user)):
+    cutoff = (local_now().date() - timedelta(days=365)).isoformat()
+    guilds = await list_guilds()
+    per_user = {r["_id"]: r for r in await db.game_logs.aggregate([
+        {"$match": {"played_at": {"$gte": cutoff}}},
+        {"$group": {"_id": "$user_id", "total_score": {"$sum": "$score"}, "games": {"$sum": 1},
+                    "wins": {"$sum": {"$cond": [{"$eq": ["$placement", 1]}, 1, 0]}},
+                    "playtime_min": {"$sum": "$playtime_min"}}}]).to_list(5000)}
+    out = []
+    for g in guilds:
+        rows = [per_user[m["user_id"]] for m in g["members"] if m["user_id"] in per_user]
+        top = max(g["members"], key=lambda m: per_user.get(m["user_id"], {}).get("total_score", float("-inf")), default=None)
+        out.append({"id": g["id"], "name": g["name"], "tag": g["tag"], "members": len(g["members"]),
+                    "total_score": sum(r["total_score"] for r in rows), "games": sum(r["games"] for r in rows),
+                    "wins": sum(r["wins"] for r in rows), "playtime_min": sum(r["playtime_min"] for r in rows),
+                    "top_player": top["name"] if top and top["user_id"] in per_user else None})
+    return {"since": cutoff, "rows": sorted(out, key=lambda r: -r["total_score"])}
+
+
 # ---------- Quarterly subscriber top-score prize ----------
 def quarter_end(year: int, q: int) -> Date:
     return Date(year, q * 3, 1) + relativedelta(months=1) - timedelta(days=1)
@@ -837,12 +940,22 @@ async def delete_collection(item_id: str, user: dict = Depends(get_current_user)
     return {"ok": True}
 
 
+async def guild_map() -> dict:
+    return {g["id"]: g for g in await db.guilds.find({}, {"_id": 0}).to_list(500)}
+
+
+def user_guilds(u: dict, gmap: dict) -> list[dict]:
+    return [{"id": gmap[g]["id"], "name": gmap[g]["name"], "tag": gmap[g]["tag"]} for g in u.get("guild_ids", []) if g in gmap]
+
+
 @api.get("/members")
 async def members():
     users = await db.users.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
     counts = {c["_id"]: c["n"] for c in await db.collections.aggregate(
         [{"$group": {"_id": "$user_id", "n": {"$sum": 1}}}]).to_list(1000)}
-    return [public_user(u) | {"collection_count": counts.get(u["user_id"], 0)} for u in users]
+    gmap = await guild_map()
+    return [public_user(u) | {"collection_count": counts.get(u["user_id"], 0), "guilds": user_guilds(u, gmap)}
+            for u in users]
 
 
 @api.get("/members/{user_id}")
@@ -858,6 +971,7 @@ async def member_profile(user_id: str):
                     "wins": {"$sum": {"$cond": [{"$eq": ["$placement", 1]}, 1, 0]}}}},
         {"$sort": {"n": -1}}]).to_list(200)
     return public_user(u) | {
+        "guilds": user_guilds(u, await guild_map()),
         "collection": {c: [i for i in items if i["category"] == c] for c in ("board", "card", "digital")},
         "stats": {"games_logged": sum(s["n"] for s in stats), "wins": sum(s["wins"] for s in stats),
                   "favourite_game": stats[0]["_id"] if stats else None},
@@ -903,9 +1017,12 @@ async def admin_checkins(date: Optional[str] = None, user: dict = Depends(requir
     rows = await db.checkins.find({"date": d}, {"_id": 0}).sort("created_at", 1).to_list(500)
     users = {u["user_id"]: u for u in await db.users.find(
         {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0}).to_list(500)}
-    heads = {s: sum(1 + len(r.get("family", [])) for r in rows if r.get("session", "day") == s) for s in SESSION_LABELS}
+    gmap = await guild_map()
+    labels = SESSION_LABELS | {r["session"]: f"Guild meet-up · {gmap.get(r.get('guild_id'), {}).get('name', 'Guild')}"
+                               for r in rows if r.get("via") == "guild"}
+    heads = {s: sum(1 + len(r.get("family", [])) for r in rows if r.get("session", "day") == s) for s in labels}
     return {"date": d, "headcount": sum(heads.values()), "session_headcount": heads,
-            "session_labels": SESSION_LABELS,
+            "session_labels": labels,
             "rows": [r | {"name": users.get(r["user_id"], {}).get("name"), "family": r.get("family", []),
                           "session": r.get("session", "day"),
                           "is_subscriber": is_subscriber(users.get(r["user_id"], {}))} for r in rows]}

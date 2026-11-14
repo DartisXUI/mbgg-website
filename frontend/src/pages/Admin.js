@@ -7,6 +7,7 @@ import { http, errMsg, plural } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { GrantMembershipButton, PrizeTracker, SessionSummary } from "@/components/AdminExtras";
 import { markCheckinsSeen } from "@/components/HeaderWidgets";
+import { GuildsTab } from "@/components/GuildAdmin";
 
 const when = (s) => new Date(s).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
@@ -45,7 +46,7 @@ const TokenAlerts = () => {
   );
 };
 
-const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", paid_earlier: "Free · paid earlier today" };
+const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", paid_earlier: "Free · paid earlier today", guild: "Guild member · free" };
 
 const CheckinRoster = () => {
   const [date, setDate] = useState("");
@@ -71,7 +72,7 @@ const CheckinRoster = () => {
               <div key={r.id} data-testid={`admin-checkin-row-${r.user_id}-${key}`} className="flex items-center gap-3 border-b border-white/5 px-5 py-3">
                 <div className="flex-1">
                   <div className="font-semibold">{r.name}</div>
-                  {r.family.length > 0 && <div data-testid={`admin-checkin-family-${r.user_id}-${key}`} className="text-xs text-slate-400">+ {r.family.map((f) => f.name).join(", ")} (under 15, free)</div>}
+                  {r.family.length > 0 && <div data-testid={`admin-checkin-family-${r.user_id}-${key}`} className="text-xs text-slate-400">{r.family.some((f) => (f.kind || "child") === "child") && <div>+ {r.family.filter((f) => (f.kind || "child") === "child").map((f) => f.name).join(", ")} (under 15, free)</div>}{r.family.some((f) => f.kind === "support") && <div>+ Support: {r.family.filter((f) => f.kind === "support").map((f) => f.name).join(", ")} (free)</div>}</div>}
                 </div>
                 <span className={`text-sm ${r.via === "paid" ? "text-mb-blue" : "text-mb-orange"}`}>{VIA[r.via]}</span>
               </div>
@@ -133,12 +134,14 @@ export default function Admin() {
           <TabsTrigger value="checkins" data-testid="admin-tab-checkins">Check-ins</TabsTrigger>
           <TabsTrigger value="sessions" data-testid="admin-tab-sessions">Session summary</TabsTrigger>
           <TabsTrigger value="prizes" data-testid="admin-tab-prizes">Prizes</TabsTrigger>
+          <TabsTrigger value="guilds" data-testid="admin-tab-guilds">Guilds</TabsTrigger>
           <TabsTrigger value="users" data-testid="admin-tab-users">Members</TabsTrigger>
         </TabsList>
         <TabsContent value="tokens" className="pt-4"><TokenAlerts /></TabsContent>
         <TabsContent value="checkins" className="pt-4"><CheckinRoster /></TabsContent>
         <TabsContent value="sessions" className="pt-4"><SessionSummary /></TabsContent>
         <TabsContent value="prizes" className="pt-4"><PrizeTracker /></TabsContent>
+        <TabsContent value="guilds" className="pt-4"><GuildsTab /></TabsContent>
         <TabsContent value="users" className="pt-4"><UsersTab /></TabsContent>
       </Tabs>
     </div>

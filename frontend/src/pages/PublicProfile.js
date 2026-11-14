@@ -21,7 +21,11 @@ export default function PublicProfile() {
       <div className="panel flex flex-col items-start gap-5 sm:flex-row sm:items-center">
         <img src={p.picture || "/brand/round.png"} alt="" className="h-24 w-24 rounded-full border-2 border-[var(--mb-blue)] object-cover" />
         <div className="flex-1">
-          <div className="eyebrow">{p.role !== "member" ? p.role : p.is_subscriber ? "Subscriber" : "Member"}{p.player_tag ? ` · ${p.player_tag}` : ""}</div>
+          <div className="eyebrow">{p.role !== "member" ? p.role : p.is_subscriber ? "Subscriber" : "Member"}</div>
+          <div data-testid="profile-ids" className="mt-1 flex flex-wrap gap-1 text-xs">
+            <span className="rounded bg-white/10 px-2 py-0.5 font-mono-x">Player ID: {p.player_tag || "—"}</span>
+            {p.guilds.map((g) => <span key={g.id} data-testid={`profile-guild-${g.id}`} className="rounded bg-[var(--mb-blue)]/15 px-2 py-0.5 font-mono-x text-mb-blue">Guild ID: {g.tag} · {g.name}</span>)}
+          </div>
           <h1 data-testid="profile-name" className="flex items-center gap-2 font-display text-4xl font-black uppercase sm:text-5xl">
             {p.name} {p.is_subscriber && <BadgeCheck data-testid="profile-subscriber-badge" className="h-7 w-7 text-mb-orange" />}
           </h1>
