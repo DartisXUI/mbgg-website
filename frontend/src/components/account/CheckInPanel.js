@@ -6,22 +6,22 @@ import { http, errMsg, money, startCheckout } from "@/lib/api";
 
 export const under15 = (f) => (f.kind || "child") !== "child" || new Date().getFullYear() - f.birth_year <= 14;
 
-const Group = ({ title, list, picked, toggle }) => list.length > 0 && (
+const Group = ({ title, list, picked, toggle, prefix }) => list.length > 0 && (
   <>
     <div className="eyebrow">{title}</div>
     {list.map((k) => (
       <label key={k.id} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-[#0B0F19]/60 px-3">
-        <Checkbox data-testid={`checkin-family-${k.id}`} checked={picked.includes(k.id)} onCheckedChange={() => toggle(k.id)} />
+        <Checkbox data-testid={`${prefix}-family-${k.id}`} checked={picked.includes(k.id)} onCheckedChange={() => toggle(k.id)} />
         <span className="font-semibold">{k.name}</span>
       </label>
     ))}
   </>
 );
 
-export const KidPicker = ({ kids, picked, toggle }) => (
-  <div data-testid="checkin-family-picker" className="mt-4 space-y-2">
-    <Group title="Family under 15 with you · free" list={kids.filter((k) => (k.kind || "child") === "child")} picked={picked} toggle={toggle} />
-    <Group title="Support workers with you · free" list={kids.filter((k) => k.kind === "support")} picked={picked} toggle={toggle} />
+export const KidPicker = ({ kids, picked, toggle, prefix = "checkin" }) => (
+  <div data-testid={`${prefix}-family-picker`} className="mt-4 space-y-2">
+    <Group prefix={prefix} title="Family under 15 with you · free" list={kids.filter((k) => (k.kind || "child") === "child")} picked={picked} toggle={toggle} />
+    <Group prefix={prefix} title="Support workers with you · free" list={kids.filter((k) => k.kind === "support")} picked={picked} toggle={toggle} />
   </div>
 );
 

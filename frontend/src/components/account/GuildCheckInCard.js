@@ -35,12 +35,13 @@ export const GuildCheckInCard = ({ data, reload }) => {
     }
   };
   const tagCls = "rounded bg-[var(--mb-blue)]/15 px-2 py-0.5 font-mono-x text-xs text-mb-blue";
+  const allDone = !!data.casual_checkin_today && data.guilds.every((g) => data.guild_checkins_today.includes(g.id));
   return (
     <div data-testid="guild-checkin-card" className="panel panel-blue">
       <div className="eyebrow text-mb-blue">Other IRL meet-ups · free</div>
       <h3 className="mt-2 flex items-center gap-2 font-display text-2xl font-extrabold uppercase"><Shield className="h-6 w-6 text-mb-blue" /> Guild & casual meet-ups</h3>
       <p className="mt-1 text-sm text-slate-400">Check in free when you attend a guild meet-up or a casual, unofficial get-together, then log the games you played as "Played at an IRL meetup". These count toward the 2-month raffle bonus too.</p>
-      {guests.length > 0 && <KidPicker kids={guests} picked={picked} toggle={toggle} />}
+      {guests.length > 0 && !allDone && <KidPicker kids={guests} picked={picked} toggle={toggle} prefix="meetup" />}
       <ul className="mt-4 space-y-2">
         <Row tag={<span className={tagCls}><Coffee className="h-3 w-3" /></span>} name="Casual meetup" testid="casual-checkin"
           done={!!data.casual_checkin_today} busy={busy === "casual"}

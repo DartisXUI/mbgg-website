@@ -1,0 +1,36 @@
+{
+  "summary": "Tested the casual meetup check-in and the guest picker on guild and casual check-ins. Backend: the new test_iteration9_casual_guests.py passes 8 of 8. Regressions also pass: iteration 8 (11/11), iteration 7 (12/12) and iteration 4 (14/14). Checked in the backend: POST /api/checkin/casual is free for non-subscribers and subscribers, returns 401 when logged out, and works with no body. A same-day duplicate returns 400. Kids and support workers are stored in family with their kinds. An unknown or aged-out family id returns 400 and creates no row. The dashboard returns casual_checkin_today. It does not change checked_in_today, attendance, door value or second_session_free. A non-subscriber's main check-in still returns 402. A subscriber can do both casual and main check-ins, and only the main one counts toward attendance and $5 door value. A casual check-in does not trigger paid_earlier, but a real paid check-in still does. Admin check-ins show a 'casual' group labelled 'Casual meetup (unofficial)' with guests counted, and the main headcount covers day and evening only. In /api/admin/summary, new_checkins shows via=casual with family_count, and checkins_today leaves out casual and guild. Casual dates show up in checkin-dates, reminders and bonus missing_dates, and an at_meetup log is accepted. Guild check-ins store de-duplicated family_ids, a non-member still gets 403, and a bad family id returns 400. A deleted guild's label now falls back to the stored guild_name. UI (desktop, plus mobile at 390px): the card shows both groups of guests. Ticking guests then pressing casual-checkin-button shows casual-checkin-done, and the guests were saved in the DB. The guild button with one kid ticked saved that kid. checkin-pay-button still reads 'Check in & pay $5' and is enabled. Account history shows 'Casual meetup' / 'Free'. The admin toast read 'TEST uicas checked in · Casual meetup + 1 free guest'. The admin Check-ins tab shows the casual group (3 people, with kid and support lines and 'Casual · free') and the guild group with its guest. The count reads '0 people at main sessions'. In the log dialog, the meetup switch is enabled and ON for today after a casual-only check-in. No functional bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Account page (CheckInCard + GuildCheckInCard)", "issue": "Duplicate data-testids: both cards render checkin-family-picker and checkin-family-<id>, so the page has 2 of each. Tests must scope by card. Consider prefixing the ones in GuildCheckInCard (e.g. meetup-family-<id>).", "selector": "[data-testid^='checkin-family-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "GuildCheckInCard", "issues": [
+        "The guest picker stays visible after the casual and all guild check-ins are done. Hide it when nothing is left to check in to.",
+        "After a guild or casual check-in, the card doesn't show which guests came along. The main card shows a 'With …' line.",
+        "One shared 'picked' state is used for every row, so the guests you tick apply to whichever button you press next. That is acceptable, but it is not obvious."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration9_casual_guests.py", "/app/backend/tests/ui_seed_iter9.py", "/app/test_reports/pytest/pytest_iter9.xml"],
+  "action_items": [
+    "Optional: give the meetup card's guest checkboxes their own testids (avoid duplicates with CheckInCard)",
+    "Optional: hide the guest picker in GuildCheckInCard once all rows are checked in, and show the guests who came with each done row"
+  ],
+  "critical_code_review_comments": [
+    "Abuse vector: a casual check-in is free, needs no membership and has no host confirmation. Any registered account can now earn the 2-month raffle bonus (BONUS_ENTRIES) by checking in casual once in a block and logging one at_meetup game; qualifies = bool(dates) and not missing. Before this change, a bonus needed a paid or subscriber check-in, or guild membership. Consider leaving casual-only check-ins out of period_progress, requiring at least one official check-in per block, or adding host approval.",
+    "Casual check-ins are limited to one per slot date (session='casual'), so a casual meetup after 5am the next day is a new date. This is fine.",
+    "The admin_checkins guild label fallback now uses r.get('guild_name'), so the iteration 8 minor issue is fixed. The DELETE guild member route now returns 404, so that issue is fixed too."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration9_casual_guests.py", "/app/backend/tests/ui_seed_iter9.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Only TEST_ users and TEST_ guilds were created, and all were removed afterwards: TEST_ users 0, checkins 0, test login_attempts 0, and the UI admin session was deleted. Two real guilds (MITHRIL, BLAZING) existed before testing started. They were created at 11:22 UTC by the real admin and were left untouched. The 2 game_logs belong to the real admin. Real users were never checked in or modified. No Square links or payments were made.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && python -m pytest test_iteration9_casual_guests.py -p no:xdist -o addopts=''. For the UI: python ui_seed_iter9.py setup creates a non-subscriber with a kid and a support worker in a TEST_ guild, and writes the tokens to /tmp/ui_iter9.json. Then run 'python ui_seed_iter9.py cleanup'. Scope checkbox selectors inside [data-testid=guild-checkin-card], because testids are duplicated. The admin toast polls every 20s and sonner toasts disappear after about 4s, so poll for [data-sonner-toast] in a loop. The real guilds MITHRIL and BLAZING now exist and include the real users; do not delete them."
+}
