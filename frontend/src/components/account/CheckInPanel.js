@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Baby, CalendarCheck, Coffee } from "lucide-react";
+import { CalendarCheck, Coffee, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { http, errMsg, money, startCheckout } from "@/lib/api";
@@ -72,7 +72,7 @@ export const CheckInCard = ({ data, reload }) => {
               <div className="font-semibold">You're checked in for this session</div>
               {u.is_subscriber && <div className="flex items-center gap-1 text-sm"><Coffee className="h-4 w-4" /> A free drink and snack included</div>}
               {inIds.size > 0 && (
-                <div data-testid="checkin-family-done" className="flex items-center gap-1 text-sm"><Baby className="h-4 w-4" /> With {data.today_checkin.family.map((f) => f.name).join(", ")}</div>
+                <div data-testid="checkin-family-done" className="flex items-center gap-1 text-sm"><Users className="h-4 w-4" /> With {data.today_checkin.family.map((f) => f.name).join(", ")}</div>
               )}
             </div>
           </div>

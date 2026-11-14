@@ -35,9 +35,9 @@ export default function Members() {
                 {m.name} {m.is_subscriber && <BadgeCheck className="h-4 w-4 shrink-0 text-mb-orange" />}
               </div>
               <div className="text-xs text-slate-400">{m.collection_count} games in collection{m.role !== "member" ? ` · ${m.role}` : ""}</div>
-              {(m.player_tag || m.guilds.length > 0) && (
+              {(
                 <div data-testid={`member-ids-${m.user_id}`} className="mt-1 flex flex-wrap gap-1 text-[11px]">
-                  {m.player_tag && <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono-x">Player ID: {m.player_tag}</span>}
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono-x">Player ID: {m.player_tag || "—"}</span>
                   {m.guilds.map((g) => <span key={g.id} title={g.name} className="rounded bg-[var(--mb-blue)]/15 px-1.5 py-0.5 font-mono-x text-mb-blue">Guild: {g.tag}</span>)}
                 </div>
               )}

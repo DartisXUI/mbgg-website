@@ -1,0 +1,36 @@
+{
+  "summary": "Tested support workers, guilds (admin CRUD, guild check-in, guild leaderboard) and the guild/player ID chips on the members and profile pages. Backend: the new test_iteration8_support_guilds.py passes 11 of 11. Regressions: iteration 7 passes 12/12 and iteration 4 passes 14/14 after one stale test was fixed (it logged a game without at_meetup, which changed in iteration 7). Checked: support workers need no birth year, child rules still apply, max 10 per type, invalid kind returns 422, checking in with a support worker stores kind 'support', and the roster headcount includes them. Guild tags are uppercased and trimmed, and duplicates return 409. GET /api/guilds is public. Adding a member is idempotent, and an unknown user or guild returns 404. A host gets 403 deleting a guild; an admin can delete it, which removes it from users. Guild check-in: a non-member gets 403, an unknown guild 404 and a same-day duplicate 400. It does not set checked_in_today, attendance stays 0 with $0 door value, second_session_free stays false, and a non-subscriber's main check-in still returns 402. The admin roster gets its own 'Guild meet-up · <name>' group. A meetup log is allowed on the guild check-in date, and the date appears in reminders and bonus missing_dates until logged. Leaderboard totals cover the last 365 days, members in two guilds count for both, rows are ranked, it shows the top player and returns 401 when logged out. UI (desktop, plus 390px mobile for the Host desk): support card add/list, family card showing children only, picker with two groups, label 'Check in free + 1 free guest', admin roster '+ Support: <name> (free)', Guilds tab create/duplicate toast/add member via select/remove/delete, guild check-in card done state, log switch enabled and ON after a guild-only check-in (saved as MEETUP), guild leaderboard tab, members chip 'Guild: TDRG', profile-ids Player ID plus profile-guild chip. All passed. No functional bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/admin/checkins", "issue": "The guild label is built from the current guild map with the fallback 'Guild'. If a guild is deleted, past check-ins show 'Guild meet-up · Guild' even though each check-in stores guild_name. Use r.get('guild_name') as the fallback."},
+      {"endpoint": "GET /api/admin/checkins, /api/admin/summary", "issue": "The headcount and checkins_today add guild meet-up check-ins to main-session check-ins. A person at both the main session and a guild meet-up is counted twice. Confirm this is intended."},
+      {"endpoint": "DELETE /api/admin/guilds/{gid}/members/{user_id}", "issue": "Returns 200 even when the guild or user doesn't exist (no 404)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Account check-in card", "issues": ["The 'With <names>' line after check-in uses the Baby icon even when only support workers are listed."]},
+      {"screen": "GuildCheckInCard", "issues": ["There is no way to bring children or support workers to a guild meet-up check-in, although the backend accepts family_ids. Optional."]},
+      {"screen": "Members page", "issues": ["Users with no player_tag show no 'Player ID' chip on /members, while the profile page shows 'Player ID: —'. This is inconsistent but minor."]},
+      {"screen": "Host desk Check-ins", "issues": ["The date filter is a native input type=date, not the shadcn calendar (existing behaviour)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration8_support_guilds.py", "/app/backend/tests/ui_seed_iter8.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [
+    "Optional: in admin_checkins, use the stored guild_name as the label fallback for deleted guilds",
+    "Optional: decide whether guild meet-up check-ins should be counted in the main headcount and checkins_today"
+  ],
+  "critical_code_review_comments": [
+    "Any guild member can self check-in to a guild meet-up on any day, since there is no schedule or host confirmation. That unlocks meetup logs, which count toward the raffle bonus. This is an honour-system gap: anyone in a guild can create a 'meetup' date and log a game on it. A guild check-in only adds a date that must be logged too, so it can't award a bonus by itself, but it can create meetup-flagged scores. Consider host-scheduled guild meet-ups if abuse matters.",
+    "list_guilds loads every user with guild_ids on each call. This is fine at the current scale."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration8_support_guilds.py", "/app/backend/tests/ui_seed_iter8.py", "/app/backend/tests/test_iteration4_sessions.py (stale test now sends at_meetup=True)"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Only TEST_ users, plus guilds created during the tests. All were removed: TEST_ users 0, guilds 0, checkins 0, game_logs 1 (the original real log), login_attempts for test emails 0, and the admin sessions created during this run were deleted. Real users (admin, user_12841c785f2b) were not modified and never added to guilds. No Square payments were made.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && python -m pytest test_iteration8_support_guilds.py -p no:xdist -o addopts=''. It cleans up its own guilds, and conftest removes TEST_ users. For the UI: python ui_seed_iter8.py setup writes the user and admin tokens to /tmp/ui_iter8.json; inject them as the session_token cookie. Afterwards run 'python ui_seed_iter8.py cleanup', which removes guilds created since setup. The game log route is /games and the Host desk is /admin."
+}

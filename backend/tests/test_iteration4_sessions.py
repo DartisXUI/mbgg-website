@@ -172,7 +172,7 @@ class TestDedupe:
         if past >= start:
             assert d["bonus"]["current"]["sessions"] == 1
         log = {"title": "TEST_Catan", "genre": "Strategy", "player_count": 4, "player_id": "Red",
-               "playtime_min": 60, "score": 10, "placement": 1, "played_at": past.isoformat()}
+               "playtime_min": 60, "score": 10, "placement": 1, "played_at": past.isoformat(), "at_meetup": True}
         assert s.post(f"{BASE_URL}/api/logs", json=log).status_code == 200
         r = s.get(f"{BASE_URL}/api/me/reminders").json()
         assert past.isoformat() not in r["unlogged_dates"]

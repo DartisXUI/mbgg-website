@@ -805,7 +805,9 @@ async def add_guild_member(gid: str, body: GuildMemberIn, staff: dict = Depends(
 
 @api.delete("/admin/guilds/{gid}/members/{user_id}")
 async def remove_guild_member(gid: str, user_id: str, staff: dict = Depends(require_staff)):
-    await db.users.update_one({"user_id": user_id}, {"$pull": {"guild_ids": gid}})
+    r = await db.users.update_one({"user_id": user_id, "guild_ids": gid}, {"$pull": {"guild_ids": gid}})
+    if not r.matched_count:
+        raise HTTPException(404, "Member not in this guild")
     return {"ok": True}
 
 
@@ -993,7 +995,7 @@ async def admin_summary(since: Optional[str] = None, user: dict = Depends(requir
                 "session": r.get("session", "day"),
                 "family_count": len(r.get("family", [])), "created_at": r["created_at"]} for r in rows]
     return {"unacked_tokens": await db.token_uses.count_documents({"acknowledged": False}),
-            "checkins_today": await db.checkins.count_documents({"date": current_slot()[0]}),
+            "checkins_today": await db.checkins.count_documents({"date": current_slot()[0], "via": {"$ne": "guild"}}),
             "latest_checkin_at": latest["created_at"] if latest else None, "new_checkins": new}
 
 
@@ -1018,10 +1020,10 @@ async def admin_checkins(date: Optional[str] = None, user: dict = Depends(requir
     users = {u["user_id"]: u for u in await db.users.find(
         {"user_id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0}).to_list(500)}
     gmap = await guild_map()
-    labels = SESSION_LABELS | {r["session"]: f"Guild meet-up · {gmap.get(r.get('guild_id'), {}).get('name', 'Guild')}"
+    labels = SESSION_LABELS | {r["session"]: f"Guild meet-up · {gmap.get(r.get('guild_id'), {}).get('name') or r.get('guild_name', 'Guild')}"
                                for r in rows if r.get("via") == "guild"}
     heads = {s: sum(1 + len(r.get("family", [])) for r in rows if r.get("session", "day") == s) for s in labels}
-    return {"date": d, "headcount": sum(heads.values()), "session_headcount": heads,
+    return {"date": d, "headcount": sum(heads[s] for s in SESSION_LABELS), "session_headcount": heads,
             "session_labels": labels,
             "rows": [r | {"name": users.get(r["user_id"], {}).get("name"), "family": r.get("family", []),
                           "session": r.get("session", "day"),
