@@ -12,13 +12,23 @@
   },
   "license": "ISC",
   "author": "DartisXUI",
-  "type": "commonjs",
-  "main": "index.js",
+  "type": "module",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "test-it",
-    "build": "echo 'No build step required'"
+    "build": "cd frontend && yarn install --network-timeout 600000 && CI=false yarn build",
+    "db:generate": "drizzle-kit generate",
+    "import:mongo": "node scripts/import-mongo.mjs"
+  },
+  "dependencies": {
+    "@netlify/database": "^2.0.3",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^1.0.0-beta.22",
+    "hono": "^4.13.18"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^1.0.0-beta.22",
+    "mongodb": "^7.9.0"
   }
 }

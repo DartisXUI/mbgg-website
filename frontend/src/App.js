@@ -1,10 +1,9 @@
 import "@/App.css";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AuthCallback } from "@/components/AuthCallback";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Account from "@/pages/Account";
@@ -19,8 +18,6 @@ import CheckoutComplete from "@/pages/CheckoutComplete";
 const guard = (el, staff) => <ProtectedRoute staff={staff}>{el}</ProtectedRoute>;
 
 const AppRouter = () => {
-  const location = useLocation();
-  if (location.hash?.includes("session_id=")) return <AuthCallback />;
   return (
     <Routes>
       <Route element={<Layout />}>
