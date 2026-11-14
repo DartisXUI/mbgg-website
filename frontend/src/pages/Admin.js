@@ -46,7 +46,7 @@ const TokenAlerts = () => {
   );
 };
 
-const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", paid_earlier: "Free · paid earlier today", guild: "Guild member · free" };
+const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", paid_earlier: "Free · paid earlier today", guild: "Guild member · free", casual: "Casual · free" };
 
 const CheckinRoster = () => {
   const [date, setDate] = useState("");

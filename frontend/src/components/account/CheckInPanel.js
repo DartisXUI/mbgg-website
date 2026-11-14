@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { http, errMsg, money, startCheckout } from "@/lib/api";
 
-const under15 = (f) => (f.kind || "child") !== "child" || new Date().getFullYear() - f.birth_year <= 14;
+export const under15 = (f) => (f.kind || "child") !== "child" || new Date().getFullYear() - f.birth_year <= 14;
 
 const Group = ({ title, list, picked, toggle }) => list.length > 0 && (
   <>
@@ -18,7 +18,7 @@ const Group = ({ title, list, picked, toggle }) => list.length > 0 && (
   </>
 );
 
-const KidPicker = ({ kids, picked, toggle }) => (
+export const KidPicker = ({ kids, picked, toggle }) => (
   <div data-testid="checkin-family-picker" className="mt-4 space-y-2">
     <Group title="Family under 15 with you · free" list={kids.filter((k) => (k.kind || "child") === "child")} picked={picked} toggle={toggle} />
     <Group title="Support workers with you · free" list={kids.filter((k) => k.kind === "support")} picked={picked} toggle={toggle} />

@@ -523,7 +523,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
                     else iso(now() - timedelta(days=365)))
     start_date = parse_dt(period_start).astimezone(TZ).date().isoformat()
     checkins = await db.checkins.find({"user_id": user["user_id"]}, {"_id": 0}).sort("date", -1).to_list(400)
-    in_period = [c for c in checkins if c["date"] >= start_date and c.get("via") != "guild"]
+    in_period = [c for c in checkins if c["date"] >= start_date and c.get("via") not in ("guild", "casual")]
     token = await db.token_uses.find_one({"user_id": user["user_id"], "month": month}, {"_id": 0})
     raffle = await db.raffle_entries.find({"user_id": user["user_id"], "year": local_now().year},
                                           {"_id": 0}).sort("number", 1).to_list(500)
@@ -548,6 +548,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "prizes": prizes, "today_date": ld.isoformat(),
             "guilds": await db.guilds.find({"id": {"$in": user.get("guild_ids", [])}}, {"_id": 0}).sort("name", 1).to_list(50),
             "guild_checkins_today": [c["guild_id"] for c in checkins if c["date"] == slot_date and c.get("via") == "guild"],
+            "casual_checkin_today": next((c for c in checkins if c["date"] == slot_date and c.get("via") == "casual"), None),
             "payments": [payment_view(p) for p in payments]}
 
 
@@ -829,6 +830,18 @@ async def guild_checkin(body: GuildCheckinIn, user: dict = Depends(get_current_u
     return {"ok": True, "date": d, "guild": g["name"]}
 
 
+@api.post("/checkin/casual")
+async def casual_checkin(body: Optional[CheckinIn] = None, user: dict = Depends(get_current_user)):
+    d, _ = current_slot()
+    doc = {"id": uuid.uuid4().hex, "user_id": user["user_id"], "date": d, "session": "casual", "via": "casual",
+           "family": eligible_family(user, body.family_ids if body else []), "created_at": iso(now())}
+    try:
+        await db.checkins.insert_one(doc)
+    except DuplicateKeyError:
+        raise HTTPException(400, "You're already checked in to a casual meetup today")
+    return {"ok": True, "date": d}
+
+
 @api.get("/leaderboards/guilds")
 async def guild_leaderboard(user: dict = Depends(get_current_user)):
     cutoff = (local_now().date() - timedelta(days=365)).isoformat()
@@ -995,7 +1008,7 @@ async def admin_summary(since: Optional[str] = None, user: dict = Depends(requir
                 "session": r.get("session", "day"),
                 "family_count": len(r.get("family", [])), "created_at": r["created_at"]} for r in rows]
     return {"unacked_tokens": await db.token_uses.count_documents({"acknowledged": False}),
-            "checkins_today": await db.checkins.count_documents({"date": current_slot()[0], "via": {"$ne": "guild"}}),
+            "checkins_today": await db.checkins.count_documents({"date": current_slot()[0], "via": {"$nin": ["guild", "casual"]}}),
             "latest_checkin_at": latest["created_at"] if latest else None, "new_checkins": new}
 
 
@@ -1022,6 +1035,8 @@ async def admin_checkins(date: Optional[str] = None, user: dict = Depends(requir
     gmap = await guild_map()
     labels = SESSION_LABELS | {r["session"]: f"Guild meet-up · {gmap.get(r.get('guild_id'), {}).get('name') or r.get('guild_name', 'Guild')}"
                                for r in rows if r.get("via") == "guild"}
+    if any(r.get("via") == "casual" for r in rows):
+        labels["casual"] = "Casual meetup (unofficial)"
     heads = {s: sum(1 + len(r.get("family", [])) for r in rows if r.get("session", "day") == s) for s in labels}
     return {"date": d, "headcount": sum(heads[s] for s in SESSION_LABELS), "session_headcount": heads,
             "session_labels": labels,

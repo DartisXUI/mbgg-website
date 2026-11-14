@@ -36,6 +36,8 @@ Choices: Square (AUD), Google + email/password login (no Facebook), one admin wh
 
 - Support workers (family entries kind "support", name only, free admission with the member, shown separately on roster). Guilds mirrored from Discord: hosts/admins create guilds (name + guild ID tag) and assign members (multi-guild); members check in free to their guilds' IRL meet-ups (session "guild:<id>", counts toward raffle bonus, not door value/main headcount); Leaderboards Guilds tab (sum of members' logs, 365 days); Player ID + Guild ID chips on members/profile pages. Tested iteration_8.
 
+- Guild meet-up check-ins accept kids/support worker guests; new free "Casual meetup" check-in (session "casual", any user, guests allowed, counts toward raffle bonus/meetup logging, excluded from door value & main headcount). Tested iteration_9.
+
 ## Backlog
 - P1: Square webhook for payments where user never returns; admin manual "paid cash"/grant membership; prize holding tracker (3-month window)
 - P2: push notifications to hosts for token alerts; shadcn date picker; raffle draw tool
