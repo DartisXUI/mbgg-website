@@ -1,0 +1,23 @@
+{
+  "name": "mbgg-website",
+  "version": "1.0.0",
+  "description": "local board game group members website",
+  "homepage": "https://github.com/DartisXUI/mbgg-website#readme",
+  "bugs": {
+    "url": "https://github.com/DartisXUI/mbgg-website/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DartisXUI/mbgg-website.git"
+  },
+  "license": "ISC",
+  "author": "DartisXUI",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "test-it"
+  }
+}
