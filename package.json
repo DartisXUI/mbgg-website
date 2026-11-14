@@ -19,5 +19,6 @@
   },
   "scripts": {
     "test": "test-it"
+    "build": "echo 'No build step required'"
   }
 }
