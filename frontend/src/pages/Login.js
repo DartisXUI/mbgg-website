@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { http, errMsg } from "@/lib/api";
 
+// Google sign-in runs through the site's own OAuth routes; the server sets the session cookie
+// and sends the browser back to /account (or to /login?error=google if it fails).
 const googleLogin = () => {
-  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-  const redirectUrl = window.location.origin + "/account";
-  window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  window.location.href = "/api/auth/google/start";
 };
 
 const Field = ({ id, label, ...props }) => (
@@ -53,6 +53,10 @@ export default function Login() {
   const { user, setUser } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
+  const authError = new URLSearchParams(loc.search).get("error");
+  useEffect(() => {
+    if (authError === "google") toast.error("Google sign-in failed. Please try again");
+  }, [authError]);
   if (user) return <Navigate to="/account" replace />;
   const done = (u) => {
     setUser(u);

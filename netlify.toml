@@ -1,0 +1,61 @@
+# Build the React app (frontend/) and publish only its compiled output.
+# The API runs as a Netlify Server from netlify/server/ and handles /api/*.
+[build]
+  command = "npm run build"
+  publish = "frontend/build"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# Client-side routes of the React app. These are listed explicitly instead of a catch-all `/*`
+# rewrite so that /api/* keeps reaching the server; any other unknown path is also answered
+# with index.html by the server's fallback route.
+[[redirects]]
+  from = "/login"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/members"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/u/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/account"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/games"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/leaderboards"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/me/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/checkout/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"

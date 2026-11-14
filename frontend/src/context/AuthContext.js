@@ -21,10 +21,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (window.location.hash?.includes("session_id=")) {
-      setLoading(false);
-      return;
-    }
     refresh();
   }, [refresh]);
 
