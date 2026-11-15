@@ -77,18 +77,33 @@ export const ensureAdmin = () => {
   return seeding;
 };
 
+// ADMIN_EMAIL may hold one address or a comma-separated list.
+export const adminEmails = () =>
+  (process.env.ADMIN_EMAIL ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+
 export async function seedAdmin() {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const pw = process.env.ADMIN_PASSWORD;
-  if (!email || !pw) return;
-  const u = await one("SELECT * FROM users WHERE email = $1", [email]);
-  if (!u) {
-    await insertUser({ email, name: process.env.ADMIN_NAME || "Admin", role: "admin", password_hash: await hashPw(pw) })
-      .catch((e) => { if (!isDuplicate(e)) throw e; });
-    return;
+  if (!pw) return;
+  // An older build treated a comma-separated ADMIN_EMAIL as one address and created an account for the
+  // whole string. No real email contains a comma, so remove that leftover account.
+  const raw = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (raw?.includes(",")) {
+    const junk = await one("SELECT user_id FROM users WHERE email = $1", [raw]);
+    if (junk) {
+      await q("DELETE FROM user_sessions WHERE user_id = $1", [junk.user_id]);
+      await q("DELETE FROM users WHERE user_id = $1", [junk.user_id]);
+    }
   }
-  const hash = u.password_hash && (await checkPw(pw, u.password_hash)) ? u.password_hash : await hashPw(pw);
-  await q("UPDATE users SET role = 'admin', password_hash = $2 WHERE user_id = $1", [u.user_id, hash]);
+  for (const email of adminEmails()) {
+    const u = await one("SELECT * FROM users WHERE email = $1", [email]);
+    if (!u) {
+      await insertUser({ email, name: process.env.ADMIN_NAME || "Admin", role: "admin", password_hash: await hashPw(pw) })
+        .catch((e) => { if (!isDuplicate(e)) throw e; });
+      continue;
+    }
+    const hash = u.password_hash && (await checkPw(pw, u.password_hash)) ? u.password_hash : await hashPw(pw);
+    await q("UPDATE users SET role = 'admin', password_hash = $2 WHERE user_id = $1", [u.user_id, hash]);
+  }
 }
 
 // ---------- Sessions ----------
