@@ -9,7 +9,7 @@ import {
 } from "./lib.mjs";
 import {
   ANNUAL_CENTS, BONUS_ENTRIES, CHECKIN_CENTS, GENRES, PRICES, awardBonuses, awardQuarterPrizes, checkPw, cleanEmail,
-  createSession, currentUser, eligibleFamily, ensureAdmin, fetchWithTimeout, freeEntry, fulfil, getUserById, hashPw,
+  adminEmails, createSession, currentUser, eligibleFamily, ensureAdmin, fetchWithTimeout, freeEntry, fulfil, getUserById, hashPw,
   insertUser, isSubscriber, meView, paidEarlier, paymentView, periodProgress, publicUser, quarterEnd, raffleCents,
   readToken, reconcilePending, requireAdmin, requireStaff, seedAdmin, sqHeaders, squareCfg, unloggedCheckins,
   verifyPayment, ytdStandings,
@@ -111,6 +111,9 @@ app.get("/api/auth/google/callback", async (c) => {
     let u = await one("SELECT * FROM users WHERE email = $1", [email]);
     if (u) await q("UPDATE users SET picture = $2 WHERE user_id = $1", [u.user_id, d.picture ?? null]);
     else u = await insertUser({ email, name: d.name || email.split("@")[0], picture: d.picture ?? null });
+    if (adminEmails().includes(email) && u.role !== "admin") {
+      await q("UPDATE users SET role = 'admin' WHERE user_id = $1", [u.user_id]);
+    }
     await createSession(c, u.user_id);
     return c.redirect("/account");
   } catch (e) {
