@@ -6,8 +6,8 @@
 // admin-only import endpoint. Safe to re-run: documents that were already imported are skipped.
 //
 //   SITE_URL=https://murraybridgegamesgroup.netlify.app \
-//   IMPORT_EMAIL=<admin email> IMPORT_PASSWORD=<admin password> \
-//   MONGO_URL=mongodb+srv://... DB_NAME=<database> \
+//   IMPORT_EMAIL=murraybridgegamesgroup25@gmail.com IMPORT_PASSWORD=JaCoB2*5& \
+//   MONGO_URL=mongodb://localhost:27017 DB_NAME=test_database \
 //   npm run import:mongo
 //
 //   # or, from mongoexport files:

@@ -45,7 +45,7 @@ const Hero = () => (
         <br />Games Group
       </h1>
       <p className="mt-6 max-w-xl text-base text-slate-300 sm:text-lg">
-        A community that plays everything from deck-builders to Smash Bros. Make an account to check in and pay online, log your games and see how you stack up.
+        A community that plays everything from deck-builders to Smash Bros. We meet at Baden Powell Hall (27 Sixth Street, Murray Bridge) on the First, Third and Possible 5th Fridays of each Month. We have 2 Sessions starting at 10am-2pm & 4pm-Late (or whenever we feel the Session has finished). We encourage our Members to make an account so they can check in & pay online when they arrive. When You do, please also log the Games You Play and see how you stack up against everyone else in the Leaderboards.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to="/account" data-testid="hero-checkin-button" className="btn-red">Check in · $5</Link>
