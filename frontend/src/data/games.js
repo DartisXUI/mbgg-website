@@ -19,7 +19,7 @@ export const FAVOURITE_GAMES = [
   { name: "Splendor", sub: "Marvel Splendor", kind: "board", q: "splendor", img: "/games/ms.png" },
   { name: "Brawlhalla", sub: "", kind: "digital", img: "/games/brawlhalla.png" },
   { name: "Super Smash Bros. Ultimate", sub: "", kind: "digital", q: "smash", img: "/games/ssbrosu.png" },
-  { name: "Star Wars: The Deckbuilding Game", sub: "Clone Wars · Mandalorian Faction", kind: "card", q: "Star Wars: The Deckbuilding Game", imgs: ["/games/sw-dbg.png", "/games/sw-dbg-cw.png", "/games/sw-dbg-mf.png" },
+  { name: "Star Wars: The Deckbuilding Game", sub: "Clone Wars · Mandalorian Faction", kind: "card", q: "Star Wars: The Deckbuilding Game", imgs: ["/games/sw-dbg.png", "/games/sw-dbg-cw.png", "/games/sw-dbg-mf.png"] },
 ];
 
 export const KIND_LABEL = { card: "Card game", board: "Board game", digital: "Video game", original: "Group original" };
