@@ -1,7 +1,7 @@
 export const FAVOURITE_GAMES = [
   { name: "Flip 7", sub: "With a Vengeance · Custom Combo Deck", kind: "card", q: "flip 7", imgs: ["/games/flip7.png", "/games/flip7-v.png"] },
   { name: "Love Letter", sub: "", kind: "card", img: "/games/ll.png" },
-  { name: "Tacta", sub: "Promotional Edition", kind: "card", imgs: "/games/tacta.png", "/games/tacta-p.png" },
+  { name: "Tacta", sub: "Promotional Edition", kind: "card", imgs: ["/games/tacta.png", "/games/tacta-p.png"] },
   { name: "Star Realms", sub: "", kind: "card", img: "/games/sr.png" },
   { name: "Shards of Infinity", sub: "Saga Collection", kind: "card", img: "/games/soi-sc.png" },
   { name: "Project L", sub: "All In KSE", kind: "board", img: "/games/pl-kse.png?v=2" },
