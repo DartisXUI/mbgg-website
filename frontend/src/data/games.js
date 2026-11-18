@@ -11,7 +11,6 @@ export const FAVOURITE_GAMES = [
   { name: "Soloverse", sub: "Our very own printed game", kind: "original", img: "/games/soloverse.png" },
   { name: "Castles of Caleira", sub: "", kind: "board", img: "/games/coc.png" },
   { name: "Ticket to Ride", sub: "", kind: "board", img: "/games/tor.png" },
-  { name: "Catan", sub: "", kind: "board", img: "/games/catan.png" },
   { name: "Stardew Valley", sub: "", kind: "digital", img: "/games/sv.png" },
   { name: "Survive the Island", sub: "Monster Pack · BFF", kind: "board", imgs: ["/games/sti.png", "/games/sti-mp.png"] },
   { name: "Jackbox Party Packs", sub: "", kind: "digital", q: "jackbox", img: "/games/jackbox.png" },
@@ -20,6 +19,7 @@ export const FAVOURITE_GAMES = [
   { name: "Brawlhalla", sub: "", kind: "digital", img: "/games/brawlhalla.png" },
   { name: "Super Smash Bros. Ultimate", sub: "", kind: "digital", q: "smash", img: "/games/ssbrosu.png" },
   { name: "Star Wars: The Deckbuilding Game", sub: "Clone Wars · Mandalorian Faction", kind: "card", q: "Star Wars: The Deckbuilding Game", imgs: ["/games/sw-dbg.png", "/games/sw-dbg-cw.png", "/games/sw-dbg-mf.png"] },
+  { name: "Catan", sub: "Seafarers · Cities and Knights", kind: "board", q: "Catan", imgs: ["/games/catan.png", "/games/catan-s.png", "/games/catan-cnk.png"] },
 ];
 
 export const KIND_LABEL = { card: "Card game", board: "Board game", digital: "Video game", original: "Group original" };
