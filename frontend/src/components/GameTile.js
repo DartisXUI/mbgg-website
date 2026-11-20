@@ -1,14 +1,14 @@
 import { Dices, Gamepad2, Layers, Sparkles } from "lucide-react";
-import { ACCENTS, KIND_LABEL } from "@/data/games";
+import { ACCENTS, KIND_LABEL, thumb } from "@/data/games";
 
 const ICONS = { card: Layers, board: Dices, digital: Gamepad2, original: Sparkles };
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-export const GameTile = ({ game, index, compact = false, onOpen }) => {
+export const GameTile = ({ game, index, variant = index, compact = false, onOpen }) => {
   const accent = ACCENTS[index % ACCENTS.length];
   const Icon = ICONS[game.kind];
-  const art = game.imgs ? game.imgs[index % game.imgs.length] : game.img;
+  const art = game.imgs ? game.imgs[variant % game.imgs.length] : game.img;
   const open = () => onOpen?.(game, art);
   if (art) {
     return (
@@ -18,9 +18,9 @@ export const GameTile = ({ game, index, compact = false, onOpen }) => {
         data-testid={`rail-tile-${slug(game.name)}`}
         title={`${game.name} · tap for details`}
         aria-label={`${game.name} details`}
-        className={`rail-tile flex cursor-pointer items-center justify-center ${compact ? "h-32 w-44 shrink-0" : "h-32"}`}
+        className={`rail-tile flex cursor-pointer items-center justify-center ${compact ? "h-20 w-full min-w-0 sm:h-32" : "h-32"}`}
       >
-        <img src={art} alt={game.name} loading="lazy" className="max-h-full max-w-full object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.6)]" />
+        <img src={thumb(art)} alt={game.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.6)]" />
       </button>
     );
   }
@@ -29,7 +29,7 @@ export const GameTile = ({ game, index, compact = false, onOpen }) => {
       type="button"
       onClick={open}
       data-testid={`rail-tile-${slug(game.name)}`}
-      className={`rail-tile relative overflow-hidden rounded-lg border bg-[#121826]/90 text-left backdrop-blur ${compact ? "w-44 shrink-0 p-3" : "p-3"}`}
+      className={`rail-tile relative overflow-hidden rounded-lg border bg-[#121826]/90 text-left backdrop-blur ${compact ? "w-full min-w-0 p-3" : "p-3"}`}
       style={{ borderColor: `${accent}55`, boxShadow: `0 0 18px ${accent}22` }}
     >
       <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
