@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { http, plural } from "@/lib/api";
-import { KIND_LABEL } from "@/data/games";
+import { KIND_LABEL, thumb } from "@/data/games";
 
 const ord = (n) => `${n}${["th", "st", "nd", "rd"][(n % 100 >> 3) ^ 1 && n % 10] || "th"}`;
 const CAT = { board: "Board", card: "Card", digital: "Digital" };
@@ -56,7 +56,7 @@ export const GameDetailsDialog = ({ game, art, onClose }) => {
           <>
             <DialogHeader>
               <div className="flex items-center gap-4">
-                {art && <img src={art} alt="" className="h-24 w-24 object-contain" />}
+                {art && <img src={thumb(art, 192)} alt="" className="h-24 w-24 object-contain" />}
                 <div className="text-left">
                   <div className="eyebrow">{KIND_LABEL[game.kind]}</div>
                   <DialogTitle data-testid="game-details-title" className="font-display text-3xl font-black uppercase">{game.name}</DialogTitle>

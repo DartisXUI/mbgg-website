@@ -22,6 +22,17 @@ export const FAVOURITE_GAMES = [
   { name: "Catan", sub: "Seafarers · Cities and Knights", kind: "board", q: "Catan", imgs: ["/games/catan.png", "/games/catan-s.png", "/games/catan-cnk.png"] },
 ];
 
+// Pictures shown in the strip under the header. Leave empty to pick from every game above,
+// or list game names (e.g. ["Catan", "Dominion", "Flip 7", "Love Letter", "Tacta"]) to limit
+// the strip to just those. With 5 or fewer names the strip stops randomising and shows them in this order;
+// with more than 5 names it randomly picks 5 of them on every page change.
+export const STRIP_GAMES = [];
+export const STRIP_COUNT = 5;
+
+// Serve game art through Netlify Image CDN: resized and converted to WebP/AVIF instead of the
+// multi-megabyte source PNGs. Each transformed image is cached on the CDN after the first request.
+export const thumb = (src, w = 360) => (src ? `/.netlify/images?url=${encodeURIComponent(src)}&w=${w}&q=75` : src);
+
 export const KIND_LABEL = { card: "Card game", board: "Board game", digital: "Video game", original: "Group original" };
 export const ACCENTS = ["#FF3B5C", "#00E5FF", "#FF8C00"];
 
