@@ -15,7 +15,7 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 const Summary = ({ rows }) => {
   const wins = rows.filter((r) => r.placement === 1).length;
   const mins = rows.reduce((a, r) => a + r.playtime_min, 0);
-  const stats = [["Plays", rows.length], ["Wins", wins], ["Total score", rows.reduce((a, r) => a + r.score, 0)], ["Hours", (mins / 60).toFixed(1)]];
+  const stats = [["Plays", rows.length], ["Wins", wins], ["Total score", rows.reduce((a, r) => a + (r.score ?? 0), 0)], ["Hours", (mins / 60).toFixed(1)]];
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {stats.map(([k, v], i) => (
@@ -33,7 +33,7 @@ const LogTable = ({ rows, onDelete }) => (
     <Table>
       <TableHeader>
         <TableRow className="border-white/10">
-          {["Date", "Game", "Genre", "Players", "Player ID", "Mins", "Score", "Place", ""].map((h) => <TableHead key={h}>{h}</TableHead>)}
+          {["Date", "Game", "Genre", "Players", "Player ID", "Mins", "Score / HP / VP", "Place", ""].map((h) => <TableHead key={h}>{h}</TableHead>)}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -45,7 +45,7 @@ const LogTable = ({ rows, onDelete }) => (
             <TableCell>{r.player_count}</TableCell>
             <TableCell>{r.player_id}</TableCell>
             <TableCell>{r.playtime_min}</TableCell>
-            <TableCell className="font-mono-x">{r.score}</TableCell>
+            <TableCell className="font-mono-x">{r.score ?? <span className="text-slate-500">N/A</span>}</TableCell>
             <TableCell className={r.placement === 1 ? "font-bold text-mb-orange" : ""}>{ord(r.placement)}</TableCell>
             <TableCell>
               <button data-testid={`gamelog-delete-${r.id}`} onClick={() => onDelete(r.id)} className="text-slate-500 hover:text-mb-red" aria-label="Delete"><Trash2 className="h-4 w-4" /></button>

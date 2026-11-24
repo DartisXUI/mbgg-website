@@ -64,8 +64,28 @@ export const eligibleFamily = (u, ids) => {
   });
 };
 
-export const paidEarlier = async (userId, date) =>
-  Boolean(await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND via = 'paid' LIMIT 1", [userId, date]));
+export const paidEarlier = async (userId, date) => Boolean(await one(
+  `SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND via IN ('paid', 'cash')
+   UNION ALL SELECT 1 FROM payments WHERE user_id = $1 AND product = 'checkin' AND status = 'COMPLETED'
+     AND meta->>'date' = $2 AND meta->>'session' = 'day' AND method IS DISTINCT FROM 'cash' LIMIT 1`, [userId, date]));
+
+/** The member's $5 admission for this session is already paid: recorded by a host (cash / off the site), or paid
+ * online for a check-in that was later undone. Returns "cash" or "online", or null when nothing is paid. */
+export const cashPass = async (userId, date, session) => {
+  const r = await one(`SELECT method FROM payments WHERE user_id = $1 AND product = 'checkin' AND status = 'COMPLETED'
+    AND meta->>'date' = $2 AND meta->>'session' = $3 ORDER BY (method = 'cash') DESC LIMIT 1`, [userId, date, session]);
+  return r ? (r.method === "cash" ? "cash" : "online") : null;
+};
+
+/** Remove a check-in. Meetup game logs that relied on it (no other check-in that day) become "played anywhere"
+ * logs: they still count for leaderboards, just not for the raffle bonus. */
+export async function removeCheckin(row) {
+  await q("DELETE FROM checkins WHERE id = $1", [row.id]);
+  if (await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 LIMIT 1", [row.user_id, row.date])) return 0;
+  const r = await q("UPDATE game_logs SET at_meetup = false WHERE user_id = $1 AND played_at = $2 AND at_meetup RETURNING id",
+    [row.user_id, row.date]);
+  return r.length;
+}
 
 // ---------- Admin seed (runs once per server process) ----------
 let seeding;
@@ -299,7 +319,7 @@ const subscribedOn = (u, d) => Boolean(u.subscription_started_at && u.subscripti
   && localDate(new Date(u.subscription_started_at)) <= d && d <= localDate(new Date(u.subscription_expires_at));
 
 export async function ytdStandings(year, end) {
-  const rows = await q(`SELECT g.user_id, sum(g.score)::float8 AS total_score, count(*)::int AS games,
+  const rows = await q(`SELECT g.user_id, COALESCE(sum(g.score), 0)::float8 AS total_score, count(*)::int AS games,
       u.name, u.picture, u.subscription_started_at, u.subscription_expires_at
     FROM game_logs g JOIN users u ON u.user_id = g.user_id
     WHERE g.played_at >= $1 AND g.played_at <= $2

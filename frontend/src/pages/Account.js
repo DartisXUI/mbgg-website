@@ -20,7 +20,7 @@ const History = ({ data }) => (
         <h4 className="font-display text-lg font-bold uppercase">Recent check-ins</h4>
         <ul className="mt-2 space-y-1 text-sm text-slate-300">
           {data.recent_checkins.length ? data.recent_checkins.map((c) => (
-            <li key={c.id} className="flex justify-between"><span>{c.date} · {c.via === "guild" ? `Guild · ${c.guild_name}` : c.via === "casual" ? "Casual meetup" : c.session === "evening" ? "4pm–late" : "10am–2pm"}</span><span className="text-slate-500">{{ subscription: "Member", staff: "Host/admin", paid: "Paid $5", paid_earlier: "Free (paid earlier)", guild: "Free", casual: "Free" }[c.via]}</span></li>
+            <li key={c.id} className="flex justify-between"><span>{c.date} · {c.via === "guild" ? `Guild · ${c.guild_name}` : c.via === "casual" ? "Casual meetup" : c.session === "evening" ? "4pm–late" : "10am–2pm"}</span><span className="text-slate-500">{{ subscription: "Member", staff: "Host/admin", paid: "Paid $5", cash: "Paid $5 (host)", paid_earlier: "Free (paid earlier)", guild: "Free", casual: "Free" }[c.via]}</span></li>
           )) : <li className="text-slate-500">None yet</li>}
         </ul>
       </div>

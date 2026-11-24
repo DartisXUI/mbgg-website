@@ -1,0 +1,1 @@
+ALTER TABLE "game_logs" ALTER COLUMN "score" DROP NOT NULL;
