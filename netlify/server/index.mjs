@@ -182,6 +182,8 @@ app.post("/api/payments/checkout", async (c) => {
     if (freeEntry(user)) fail(400, "You check in free. Use the free check-in button");
     [meta.date, meta.session] = currentSlot();
     meta.family = eligibleFamily(user, b.family_ids);
+    if ((await meetupLock(meta.date)) === "free")
+      fail(400, "Today is a free official meetup, so there's nothing to pay. Use the free check-in button");
     if (await paidEarlier(user.user_id, meta.date))
       fail(400, "You already paid today, so this session is free. Use the free check-in button");
     if (await cashPass(user.user_id, meta.date, meta.session))
@@ -249,7 +251,7 @@ app.get("/api/me/dashboard", async (c) => {
   const startDate = localDate(periodStart);
   const checkins = await q("SELECT * FROM checkins WHERE user_id = $1 ORDER BY date DESC, created_at DESC LIMIT 400", [id]);
   const inPeriod = checkins.filter((ch) => ch.date >= startDate && !["guild", "casual"].includes(ch.via));
-  const [token, raffle, payments, bonusNow, bonuses, prizes, guildRows, unlogged, secondFree, paidDay, paidCash] = await Promise.all([
+  const [token, raffle, payments, bonusNow, bonuses, prizes, guildRows, unlogged, secondFree, paidDay, paidCash, treat] = await Promise.all([
     one("SELECT * FROM token_uses WHERE user_id = $1 AND month = $2", [id, month]),
     q("SELECT number, source FROM raffle_entries WHERE user_id = $1 AND year = $2 ORDER BY number", [id, lp.year]),
     q("SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10", [id]),
@@ -259,13 +261,14 @@ app.get("/api/me/dashboard", async (c) => {
     q("SELECT * FROM guilds WHERE id = ANY($1::text[]) ORDER BY name", [user.guild_ids ?? []]),
     unloggedCheckins(id),
     freeEntry(user) ? false : paidEarlier(id, slotDate),
-    isPaidMeetupDay(slotDate),
+    meetupLock(slotDate),
     freeEntry(user) ? false : cashPass(id, slotDate, slot),
+    one("SELECT * FROM treat_requests WHERE user_id = $1 AND date = $2", [id, slotDate]),
   ]);
   const todayCheckin = checkins.find((ch) => ch.date === slotDate && (ch.session ?? "day") === slot) ?? null;
   return c.json({
     user: meView(user), today: slotDate, checked_in_today: Boolean(todayCheckin),
-    session: { key: slot, label: SESSION_LABELS[slot] }, second_session_free: secondFree, cash_entry: paidCash || false, paid_meetup_day: paidDay,
+    session: { key: slot, label: SESSION_LABELS[slot] }, second_session_free: secondFree, cash_entry: paidCash || false, paid_meetup_day: paidDay === "paid", free_meetup_day: paidDay === "free", treat_request: treat ?? null,
     today_checkin: todayCheckin, free_entry: freeEntry(user), unlogged_dates: unlogged,
     attendance: { sessions: inPeriod.length, since: startDate,
       door_value_cents: new Set(inPeriod.map((ch) => ch.date)).size * CHECKIN_CENTS, membership_cents: ANNUAL_CENTS },
@@ -326,8 +329,10 @@ app.post("/api/checkin/family", async (c) => {
   return c.json({ ok: true, added: added.length });
 });
 
-const isPaidMeetupDay = async (d) => Boolean(await one("SELECT 1 FROM paid_meetup_days WHERE date = $1", [d]));
-const PAID_DAY_MSG = "Today is an official paid meetup, so free casual and guild check-ins are off. Use the session check-in instead";
+// "paid" | "free" | null: whether a host locked this date to the official session check-in.
+const meetupLock = async (d) => (await one("SELECT kind FROM paid_meetup_days WHERE date = $1", [d]))?.kind ?? null;
+const LOCK_MSG = { paid: "Today is an official paid meetup, so free casual and guild check-ins are off. Use the session check-in instead",
+  free: "Today is a free official meetup, so casual and guild check-ins are off. Use the session check-in instead (it's free today)" };
 
 async function insertCheckin(doc, dupMsg) {
   try {
@@ -347,6 +352,7 @@ app.post("/api/checkin", async (c) => {
   let pass;
   if (freeEntry(user)) via = isSubscriber(user) ? "subscription" : "staff";
   else if ((pass = await cashPass(user.user_id, d, s))) via = pass === "cash" ? "cash" : "paid";
+  else if ((await meetupLock(d)) === "free") via = "free_meetup";
   else if (await paidEarlier(user.user_id, d)) via = "paid_earlier";
   else fail(402, "Admission is $5. Use check in & pay");
   const family = eligibleFamily(user, idList(await body(c), "family_ids"));
@@ -379,6 +385,38 @@ app.post("/api/token/use", async (c) => {
     if (isDuplicate(e)) fail(400, "You've already used this month's game choice");
     throw e;
   }
+});
+
+// ---------- Free drink & snack (subscribers, free official meetup days only) ----------
+app.post("/api/treat/request", async (c) => {
+  const user = await currentUser(c);
+  const note = str(await body(c), "note", { max: 120, def: "" }).trim();
+  if (!isSubscriber(user)) fail(403, "The free drink & snack is for annual subscribers");
+  const [d] = currentSlot();
+  if ((await meetupLock(d)) !== "free") fail(403, "The free drink & snack unlocks at free official meetups");
+  if (!(await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND via NOT IN ('guild', 'casual')", [user.user_id, d])))
+    fail(400, "Check in to today's meetup first");
+  try {
+    return c.json(await one(`INSERT INTO treat_requests (id, user_id, user_name, date, note, acknowledged, created_at)
+      VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`, [uid(), user.user_id, user.name, d, note, now()]));
+  } catch (e) {
+    if (isDuplicate(e)) fail(400, "You've already asked for today's free drink & snack");
+    throw e;
+  }
+});
+
+app.get("/api/admin/treat-requests", async (c) => {
+  await requireStaff(c);
+  return c.json(await q("SELECT * FROM treat_requests WHERE date >= $1 ORDER BY acknowledged, created_at DESC LIMIT 200",
+    [addDays(localDate(), -7)]));
+});
+
+app.post("/api/admin/treat-requests/:id/ack", async (c) => {
+  const user = await requireStaff(c);
+  const r = await one("UPDATE treat_requests SET acknowledged = true, acknowledged_by = $2, acknowledged_at = $3 WHERE id = $1 RETURNING id",
+    [c.req.param("id"), user.name, now()]);
+  if (!r) fail(404, "Request not found");
+  return c.json({ ok: true });
 });
 
 // ---------- Game logs & leaderboards ----------
@@ -518,7 +556,8 @@ app.post("/api/checkin/guild", async (c) => {
   if (!g) fail(404, "Guild not found");
   if (!(user.guild_ids ?? []).includes(gid)) fail(403, "Only members of this guild can check in to its meet-ups");
   const [d] = currentSlot();
-  if (await isPaidMeetupDay(d)) fail(403, PAID_DAY_MSG);
+  const lock = await meetupLock(d);
+  if (lock) fail(403, LOCK_MSG[lock]);
   const family = eligibleFamily(user, idList(b, "family_ids"));
   await insertCheckin({ user_id: user.user_id, date: d, session: `guild:${g.id}`, via: "guild", guild_id: g.id,
     guild_name: g.name, family }, `You're already checked in to today's ${g.name} meet-up`);
@@ -528,7 +567,8 @@ app.post("/api/checkin/guild", async (c) => {
 app.post("/api/checkin/casual", async (c) => {
   const user = await currentUser(c);
   const [d] = currentSlot();
-  if (await isPaidMeetupDay(d)) fail(403, PAID_DAY_MSG);
+  const lock = await meetupLock(d);
+  if (lock) fail(403, LOCK_MSG[lock]);
   const family = eligibleFamily(user, idList(await body(c), "family_ids"));
   await insertCheckin({ user_id: user.user_id, date: d, session: "casual", via: "casual", family },
     "You're already checked in to a casual meetup today");
@@ -631,9 +671,11 @@ app.get("/api/admin/summary", async (c) => {
       family_count: (r.family ?? []).length, created_at: r.created_at }));
   }
   const { tokens } = await one("SELECT count(*)::int AS tokens FROM token_uses WHERE NOT acknowledged");
+  const treats = await q(`SELECT id, user_name, note, created_at FROM treat_requests WHERE NOT acknowledged AND date = $1
+    ORDER BY created_at LIMIT 100`, [currentSlot()[0]]);
   const { today } = await one("SELECT count(*)::int AS today FROM checkins WHERE date = $1 AND via NOT IN ('guild', 'casual')",
     [currentSlot()[0]]);
-  return c.json({ unacked_tokens: tokens, checkins_today: today, latest_checkin_at: latest?.created_at ?? null, new_checkins: fresh });
+  return c.json({ unacked_tokens: tokens, pending_treats: treats, checkins_today: today, latest_checkin_at: latest?.created_at ?? null, new_checkins: fresh });
 });
 
 app.get("/api/admin/token-alerts", async (c) => {
@@ -663,28 +705,31 @@ app.get("/api/admin/checkins", async (c) => {
   const heads = Object.fromEntries(Object.keys(labels).map((s) => [s,
     rows.filter((r) => (r.session ?? "day") === s).reduce((a, r) => a + 1 + (r.family ?? []).length, 0)]));
   const lock = await one("SELECT * FROM paid_meetup_days WHERE date = $1", [d]);
-  return c.json({ date: d, paid_meetup_day: Boolean(lock), paid_meetup_set_by: lock?.set_by ?? null,
+  return c.json({ date: d, paid_meetup_day: lock?.kind === "paid", free_meetup_day: lock?.kind === "free",
+    meetup_lock: lock?.kind ?? null, paid_meetup_set_by: lock?.set_by ?? null,
     headcount: Object.keys(SESSION_LABELS).reduce((a, s) => a + heads[s], 0),
     session_headcount: heads, session_labels: labels,
     rows: rows.map(({ user_name, subscription_expires_at, ...r }) => ({ ...r, name: user_name ?? null, family: r.family ?? [],
       session: r.session ?? "day", is_subscriber: isSubscriber({ subscription_expires_at }) })) });
 });
 
-// Hosts mark a date as an official paid meetup: free casual and guild check-ins are switched off for that date.
+// Hosts mark a date as an official meetup (kind "paid" = $5 entry, "free" = free for everyone). Either way the
+// casual and guild check-ins are switched off for that date.
 app.put("/api/admin/paid-days/:date", async (c) => {
   const staff = await requireStaff(c);
   const d = c.req.param("date");
   if (!isDateStr(d)) fail(400, "Invalid date");
   if (d < addDays(localDate(), -1)) fail(400, "Pick today or a future date");
-  await q(`INSERT INTO paid_meetup_days (date, set_by, created_at) VALUES ($1, $2, $3)
-    ON CONFLICT (date) DO UPDATE SET set_by = EXCLUDED.set_by`, [d, staff.name, now()]);
-  return c.json({ ok: true, date: d, paid_meetup_day: true });
+  const kind = oneOf(await body(c), "kind", ["paid", "free"], "paid");
+  await q(`INSERT INTO paid_meetup_days (date, kind, set_by, created_at) VALUES ($1, $2, $3, $4)
+    ON CONFLICT (date) DO UPDATE SET kind = EXCLUDED.kind, set_by = EXCLUDED.set_by`, [d, kind, staff.name, now()]);
+  return c.json({ ok: true, date: d, meetup_lock: kind, paid_meetup_day: kind === "paid", free_meetup_day: kind === "free" });
 });
 
 app.delete("/api/admin/paid-days/:date", async (c) => {
   await requireStaff(c);
   await q("DELETE FROM paid_meetup_days WHERE date = $1", [c.req.param("date")]);
-  return c.json({ ok: true, date: c.req.param("date"), paid_meetup_day: false });
+  return c.json({ ok: true, date: c.req.param("date"), meetup_lock: null, paid_meetup_day: false, free_meetup_day: false });
 });
 
 app.get("/api/admin/paid-days", async (c) => {

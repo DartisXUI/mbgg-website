@@ -179,10 +179,29 @@ export const prizes = pgTable("prizes", {
   index("prizes_collected_by_idx").on(t.collected, t.collect_by),
 ]);
 
-// Days a host has marked as an official paid meetup. On these dates the free casual and guild check-ins are
-// switched off, so the only way in is the $5 check-in (free for subscribers, hosts and cash payers).
+// Days a host has marked as an official meetup. On these dates the free casual and guild check-ins are
+// switched off, so the only way in is the session check-in. kind "paid": $5 (free for subscribers, hosts and
+// cash payers). kind "free": a free official meetup, so the session check-in is free for everyone.
 export const paidMeetupDays = pgTable("paid_meetup_days", {
   date: text().primaryKey(),
+  kind: text().notNull().default("paid"),
   set_by: text(),
   created_at: created(),
 });
+
+// A subscriber asking the hosts for their free drink & snack. Only possible on free official meetup days,
+// once per member per day. Hosts tick it off when it's handed over.
+export const treatRequests = pgTable("treat_requests", {
+  id: text().primaryKey(),
+  user_id: text().notNull(),
+  user_name: text(),
+  date: text().notNull(),
+  note: text().notNull().default(""),
+  acknowledged: boolean().notNull().default(false),
+  acknowledged_by: text(),
+  acknowledged_at: ts("acknowledged_at"),
+  created_at: created(),
+}, (t) => [
+  uniqueIndex("treat_requests_user_date_idx").on(t.user_id, t.date),
+  index("treat_requests_ack_date_idx").on(t.acknowledged, t.date),
+]);
