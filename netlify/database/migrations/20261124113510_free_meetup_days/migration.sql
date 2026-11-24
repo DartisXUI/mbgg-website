@@ -1,0 +1,1 @@
+ALTER TABLE "paid_meetup_days" ADD COLUMN "kind" text DEFAULT 'paid' NOT NULL;

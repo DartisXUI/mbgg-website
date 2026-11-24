@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, Check, Crown, Lock, LockOpen, X } from "lucide-react";
+import { BadgeCheck, Check, Coffee, Crown, Lock, LockOpen, X } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -46,27 +46,70 @@ const TokenAlerts = () => {
   );
 };
 
-const VIA = { subscription: "Member · free drink & snack", staff: "Host/admin · free", paid: "Paid $5", cash: "Paid $5 to host · free entry", paid_earlier: "Free · paid earlier today", guild: "Guild member · free", casual: "Casual · free" };
+// Subscribers asking for their free drink & snack at free official meetups.
+const TreatRequests = () => {
+  const [list, setList] = useState([]);
+  const load = useCallback(() => http.get("/admin/treat-requests").then((r) => setList(r.data)).catch(() => {}), []);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [load]);
+  const ack = async (id) => {
+    await http.post(`/admin/treat-requests/${id}/ack`).catch((e) => toast.error(errMsg(e)));
+    window.dispatchEvent(new Event("mbgg-alerts"));
+    load();
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-400">Subscribers can ask for their free drink & snack here on free official meetup days. Tick each one off once it's handed over.</p>
+      {list.map((a) => (
+        <div key={a.id} data-testid={`treat-request-${a.id}`} className={`panel flex flex-wrap items-center gap-4 ${a.acknowledged ? "opacity-60" : "panel-blue"}`}>
+          <Coffee className="h-6 w-6 text-mb-blue" />
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-2xl font-bold uppercase">{a.user_name || "Subscriber"}</div>
+            <div className="text-sm text-slate-400">{a.date} · {when(a.created_at)}</div>
+            {a.note && <div className="mt-1 text-sm text-slate-300">"{a.note}"</div>}
+          </div>
+          {a.acknowledged ? (
+            <span className="text-sm text-emerald-400">Handed over by {a.acknowledged_by}</span>
+          ) : (
+            <button data-testid={`treat-ack-button-${a.id}`} onClick={() => ack(a.id)} className="btn-blue"><Check className="h-4 w-4" /> Handed over</button>
+          )}
+        </div>
+      ))}
+      {!list.length && <p className="py-10 text-center text-slate-500">No drink & snack requests this week.</p>}
+    </div>
+  );
+};
 
-// Lock a date to the paid session check-in only (no free casual / guild check-ins).
+const VIA = { subscription: "Member · free entry", staff: "Host/admin · free", paid: "Paid $5", cash: "Paid $5 to host · free entry", paid_earlier: "Free · paid earlier today", guild: "Guild member · free", casual: "Casual · free", free_meetup: "Free official meetup" };
+
+// Lock a date to the official session check-in only (no casual / guild check-ins): either a paid ($5) meetup
+// or a free official meetup where the session check-in is free for everyone.
 const PaidDayToggle = ({ date, data, onDone }) => {
   const [busy, setBusy] = useState(false);
   const [upcoming, setUpcoming] = useState([]);
   const loadUpcoming = useCallback(() => http.get("/admin/paid-days").then((r) => setUpcoming(r.data)).catch(() => {}), []);
   useEffect(() => {
     loadUpcoming();
-  }, [loadUpcoming, data?.paid_meetup_day]);
+  }, [loadUpcoming, data?.meetup_lock]);
   if (!date || !data) return null;
-  const on = data.paid_meetup_day;
+  const lock = data.meetup_lock || (data.paid_meetup_day ? "paid" : null);
   const past = date < adelaideToday();
-  const toggle = async () => {
-    const ask = on ? `Turn free casual & guild check-ins back on for ${date}?` : `Make ${date} an official paid meetup? Members will only see the session check-in: $5, or free for subscribers, hosts and anyone marked as paid cash. Free casual and guild check-ins are switched off for the day.`;
-    if (busy || !window.confirm(ask)) return;
+  const asks = {
+    paid: `Make ${date} an official paid meetup? Members will only see the session check-in: $5, or free for subscribers, hosts and anyone marked as paid cash. Casual and guild check-ins are switched off for the day.`,
+    free: `Make ${date} a free official meetup? Everyone checks in to the session free, with no $5 entry, and subscribers can ask hosts for their free drink & snack. Casual and guild check-ins are switched off for the day.`,
+    off: `Turn casual & guild check-ins back on for ${date}? The session check-in goes back to the usual $5.`,
+  };
+  const done = { paid: `${date} is now a paid meetup day`, free: `${date} is now a free official meetup`, off: "Casual & guild check-ins are back on" };
+  const set = async (kind) => {
+    if (busy || !window.confirm(asks[kind])) return;
     setBusy(true);
     try {
-      if (on) await http.delete(`/admin/paid-days/${date}`);
-      else await http.put(`/admin/paid-days/${date}`);
-      toast.success(on ? "Free check-ins are back on" : `${date} is now a paid meetup day`);
+      if (kind === "off") await http.delete(`/admin/paid-days/${date}`);
+      else await http.put(`/admin/paid-days/${date}`, { kind });
+      toast.success(done[kind]);
       await onDone();
     } catch (e) {
       toast.error(errMsg(e));
@@ -74,18 +117,26 @@ const PaidDayToggle = ({ date, data, onDone }) => {
       setBusy(false);
     }
   };
+  const title = { paid: "Paid meetup day · check-ins locked", free: "Free official meetup · check-ins locked" }[lock] || "Casual & guild check-ins allowed";
+  const text = {
+    paid: `Only the $5 session check-in is shown on ${date} (free for subscribers, hosts & cash payers). Set by ${data.paid_meetup_set_by || "a host"}.`,
+    free: `Only the session check-in is shown on ${date}, and it's free for everyone. Set by ${data.paid_meetup_set_by || "a host"}.`,
+  }[lock] || `On ${date} members can also use free casual and guild check-ins. Lock the day when an official meetup is on, paid or free.`;
+  const btn = (kind, cls, icon, label) => (
+    <button data-testid={`paid-day-${kind}-button`} disabled={busy} onClick={() => set(kind)} className={cls}>{icon} {label}</button>
+  );
   return (
-    <div data-testid="paid-day-panel" className={`panel flex flex-wrap items-center gap-3 ${on ? "panel-red" : ""}`}>
+    <div data-testid="paid-day-panel" className={`panel flex flex-wrap items-center gap-3 ${lock === "paid" ? "panel-red" : lock === "free" ? "panel-blue" : ""}`}>
       <div className="min-w-0 flex-1">
-        <div className="font-display text-xl font-bold uppercase">{on ? "Paid meetup day · check-ins locked" : "Free check-ins allowed"}</div>
-        <p className="text-sm text-slate-400">{on ? `Only the $5 session check-in is shown on ${date} (free for subscribers, hosts & cash payers). Set by ${data.paid_meetup_set_by || "a host"}.` : `On ${date} members can also use free casual and guild check-ins. Lock the day when a paid meetup is on.`}</p>
-        {upcoming.length > 0 && <p data-testid="paid-day-upcoming" className="mt-1 text-xs text-mb-orange">Locked days: {upcoming.map((p) => p.date).join(", ")}</p>}
+        <div className="font-display text-xl font-bold uppercase">{title}</div>
+        <p className="text-sm text-slate-400">{text}</p>
+        {upcoming.length > 0 && <p data-testid="paid-day-upcoming" className="mt-1 text-xs text-mb-orange">Locked days: {upcoming.map((p) => `${p.date} (${p.kind === "free" ? "free" : "paid"})`).join(", ")}</p>}
       </div>
-      {(!past || on) && (
-        <button data-testid="paid-day-toggle-button" disabled={busy} onClick={toggle} className={on ? "btn-ghost" : "btn-red"}>
-          {on ? <><LockOpen className="h-4 w-4" /> Unlock free check-ins</> : <><Lock className="h-4 w-4" /> Paid meetup: lock check-ins</>}
-        </button>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {!past && lock !== "paid" && btn("paid", "btn-red", <Lock className="h-4 w-4" />, lock ? "Switch to paid meetup" : "Paid meetup: lock check-ins")}
+        {!past && lock !== "free" && btn("free", "btn-blue", <Lock className="h-4 w-4" />, lock ? "Switch to free official meetup" : "Free official meetup")}
+        {lock && btn("off", "btn-ghost", <LockOpen className="h-4 w-4" />, "Unlock casual & guild check-ins")}
+      </div>
     </div>
   );
 };
@@ -188,6 +239,7 @@ export default function Admin() {
       <Tabs defaultValue="tokens">
         <TabsList className="h-auto flex-wrap bg-[#121826]">
           <TabsTrigger value="tokens" data-testid="admin-tab-tokens">Game choices</TabsTrigger>
+          <TabsTrigger value="treats" data-testid="admin-tab-treats">Drinks & snacks</TabsTrigger>
           <TabsTrigger value="checkins" data-testid="admin-tab-checkins">Check-ins</TabsTrigger>
           <TabsTrigger value="sessions" data-testid="admin-tab-sessions">Session summary</TabsTrigger>
           <TabsTrigger value="prizes" data-testid="admin-tab-prizes">Prizes</TabsTrigger>
@@ -195,6 +247,7 @@ export default function Admin() {
           <TabsTrigger value="users" data-testid="admin-tab-users">Members</TabsTrigger>
         </TabsList>
         <TabsContent value="tokens" className="pt-4"><TokenAlerts /></TabsContent>
+        <TabsContent value="treats" className="pt-4"><TreatRequests /></TabsContent>
         <TabsContent value="checkins" className="pt-4"><CheckinRoster /></TabsContent>
         <TabsContent value="sessions" className="pt-4"><SessionSummary /></TabsContent>
         <TabsContent value="prizes" className="pt-4"><PrizeTracker /></TabsContent>

@@ -38,12 +38,13 @@ export const GuildCheckInCard = ({ data, reload }) => {
     }
   };
   const tagCls = "rounded bg-[var(--mb-blue)]/15 px-2 py-0.5 font-mono-x text-xs text-mb-blue";
-  if (data.paid_meetup_day) {
+  if (data.paid_meetup_day || data.free_meetup_day) {
+    const freeDay = data.free_meetup_day;
     return (
       <div data-testid="guild-checkin-locked" className="panel">
-        <div className="eyebrow text-mb-red">Official paid meetup today</div>
+        <div className={`eyebrow ${freeDay ? "text-mb-blue" : "text-mb-red"}`}>{freeDay ? "Free official meetup today" : "Official paid meetup today"}</div>
         <h3 className="mt-2 flex items-center gap-2 font-display text-2xl font-extrabold uppercase"><Shield className="h-6 w-6 text-slate-500" /> Guild & casual check-ins are off</h3>
-        <p className="mt-1 text-sm text-slate-400">Hosts have marked today as a paid meetup, so please use the session check-in. It's $5, or free if you're a subscriber or have already paid a host.</p>
+        <p className="mt-1 text-sm text-slate-400">{freeDay ? "Hosts have marked today as a free official meetup, so please use the session check-in. It's free for everyone today." : "Hosts have marked today as a paid meetup, so please use the session check-in. It's $5, or free if you're a subscriber or have already paid a host."}</p>
       </div>
     );
   }

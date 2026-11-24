@@ -6,6 +6,7 @@ import { http } from "@/lib/api";
 
 const SEEN_KEY = "mbgg-checkins-seen";
 const TOASTED_KEY = "mbgg-checkins-toasted";
+const TREATS_KEY = "mbgg-treats-toasted";
 
 export const markCheckinsSeen = () => {
   localStorage.setItem(SEEN_KEY, new Date().toISOString());
@@ -29,7 +30,13 @@ export const useStaffAlerts = (user) => {
           .filter((c) => c.created_at > last)
           .forEach((c) => toast.info(`${c.name} checked in · ${c.via === "guild" ? "Guild meet-up" : c.via === "casual" ? "Casual meetup" : c.session === "evening" ? "4pm–late" : "10am–2pm"}${c.family_count ? ` + ${c.family_count} free guest${c.family_count === 1 ? "" : "s"}` : ""}`, { id: c.id }));
         if (data.new_checkins.length) sessionStorage.setItem(TOASTED_KEY, data.new_checkins.at(-1).created_at);
-        setCount(data.unacked_tokens + data.new_checkins.length);
+        const told = new Set(JSON.parse(sessionStorage.getItem(TREATS_KEY) || "[]"));
+        (data.pending_treats || []).filter((t) => !told.has(t.id)).forEach((t) => {
+          told.add(t.id);
+          toast.info(`☕ ${t.user_name || "A subscriber"} wants their free drink & snack${t.note ? `: ${t.note}` : ""}`, { id: `treat-${t.id}`, duration: 15000 });
+        });
+        sessionStorage.setItem(TREATS_KEY, JSON.stringify([...told].slice(-200)));
+        setCount(data.unacked_tokens + data.new_checkins.length + (data.pending_treats || []).length);
       } catch {
         /* polling */
       }
