@@ -33,7 +33,7 @@ const Recent = ({ recent }) => (
           <li key={r.id} data-testid={`game-recent-${r.id}`} className="flex items-center gap-3 py-2 text-sm">
             <span className={`w-10 font-display text-lg font-black ${r.placement === 1 ? "text-mb-orange" : "text-slate-400"}`}>{ord(r.placement)}</span>
             <span className="flex-1 truncate"><b>{r.name}</b> <span className="text-xs text-slate-500">{r.title} · {r.player_count}p</span></span>
-            <span className="font-mono-x">{r.score}</span>
+            <span className="font-mono-x">{r.score ?? <span className="text-slate-500">N/A</span>}</span>
             <span className="w-20 text-right text-xs text-slate-500 sm:w-24">{r.played_at}</span>
           </li>
         ))}

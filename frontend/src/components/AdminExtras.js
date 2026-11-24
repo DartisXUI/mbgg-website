@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Gift, Users } from "lucide-react";
+import { Check, Gift, Ticket, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,7 +45,7 @@ export const SessionSummary = () => {
                 <span className={`w-10 font-display text-lg font-black ${e.placement === 1 ? "text-mb-orange" : "text-slate-400"}`}>{ord(e.placement)}</span>
                 <span className="flex-1 font-semibold">{e.name} <span className="text-xs font-normal text-slate-500">({e.player_id})</span></span>
                 <span className="hidden text-xs text-slate-500 sm:inline">{e.player_count}p · {e.playtime_min}m</span>
-                <span className="font-mono-x">{e.score}</span>
+                <span className="font-mono-x">{e.score ?? <span className="text-slate-500">N/A</span>}</span>
               </div>
             ))}
           </div>
@@ -139,6 +139,37 @@ export const GrantMembershipButton = ({ u, onDone }) => {
   return (
     <button data-testid={`admin-grant-membership-button-${u.user_id}`} disabled={busy} onClick={grant} className="btn-blue !min-h-[38px] !px-4 text-sm">
       <Users className="h-4 w-4" /> Paid cash · {u.is_subscriber ? "+1 year" : "give year"}
+    </button>
+  );
+};
+
+// Host records that a member paid the $5 session admission in cash / off the site. The member then
+// checks in free themselves, which lets them log games from this official meetup.
+export const CashEntryButton = ({ u, onDone }) => {
+  const [busy, setBusy] = useState(false);
+  if (u.free_entry) return null;
+  const marked = u.cash_entry_now;
+  const toggle = async () => {
+    const ask = marked ? `Undo ${u.name}'s paid entry for this session?` : `Record that ${u.name} paid the $5 entry (cash or off the site) for this session? They can then check in free.`;
+    if (busy || !window.confirm(ask)) return;
+    setBusy(true);
+    try {
+      if (marked) await http.delete(`/admin/users/${u.user_id}/cash-entry`);
+      else await http.post(`/admin/users/${u.user_id}/cash-entry`);
+      toast.success(marked ? `${u.name}'s paid entry was removed` : `${u.name} can now check in free for this session`);
+      await onDone();
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (u.checked_in_now) {
+    return <span data-testid={`admin-cash-entry-status-${u.user_id}`} className="text-xs text-emerald-400"><Check className="inline h-3.5 w-3.5" /> Checked in this session</span>;
+  }
+  return (
+    <button data-testid={`admin-cash-entry-button-${u.user_id}`} disabled={busy} onClick={toggle} className={`${marked ? "btn-ghost" : "btn-orange"} !min-h-[38px] !px-4 text-sm`}>
+      <Ticket className="h-4 w-4" /> {marked ? "Free entry set · undo" : "Paid $5 · free entry"}
     </button>
   );
 };

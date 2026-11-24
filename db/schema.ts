@@ -83,7 +83,7 @@ export const gameLogs = pgTable("game_logs", {
   player_count: integer().notNull(),
   player_id: text().notNull(),
   playtime_min: integer().notNull(),
-  score: integer().notNull(),
+  score: integer(),
   placement: integer().notNull(),
   played_at: text().notNull(),
   at_meetup: boolean().notNull().default(false),
@@ -178,3 +178,11 @@ export const prizes = pgTable("prizes", {
   index("prizes_user_collect_idx").on(t.user_id, t.collect_by),
   index("prizes_collected_by_idx").on(t.collected, t.collect_by),
 ]);
+
+// Days a host has marked as an official paid meetup. On these dates the free casual and guild check-ins are
+// switched off, so the only way in is the $5 check-in (free for subscribers, hosts and cash payers).
+export const paidMeetupDays = pgTable("paid_meetup_days", {
+  date: text().primaryKey(),
+  set_by: text(),
+  created_at: created(),
+});

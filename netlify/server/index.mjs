@@ -10,7 +10,7 @@ import {
 import {
   ANNUAL_CENTS, BONUS_ENTRIES, CHECKIN_CENTS, GENRES, PRICES, awardBonuses, awardQuarterPrizes, checkPw, cleanEmail,
   adminEmails, createSession, currentUser, eligibleFamily, ensureAdmin, fetchWithTimeout, freeEntry, fulfil, getUserById, hashPw,
-  insertUser, isSubscriber, meView, paidEarlier, paymentView, periodProgress, publicUser, quarterEnd, raffleCents,
+  insertUser, isSubscriber, meView, paidEarlier, cashPass, removeCheckin, paymentView, periodProgress, publicUser, quarterEnd, raffleCents,
   readToken, reconcilePending, requireAdmin, requireStaff, seedAdmin, sqHeaders, squareCfg, unloggedCheckins,
   verifyPayment, ytdStandings,
 } from "./core.mjs";
@@ -184,6 +184,8 @@ app.post("/api/payments/checkout", async (c) => {
     meta.family = eligibleFamily(user, b.family_ids);
     if (await paidEarlier(user.user_id, meta.date))
       fail(400, "You already paid today, so this session is free. Use the free check-in button");
+    if (await cashPass(user.user_id, meta.date, meta.session))
+      fail(400, "Your $5 for this session is already paid. Use the check-in button");
     if (await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND session = $3",
       [user.user_id, meta.date, meta.session])) fail(400, "You're already checked in for this session");
   }
@@ -247,7 +249,7 @@ app.get("/api/me/dashboard", async (c) => {
   const startDate = localDate(periodStart);
   const checkins = await q("SELECT * FROM checkins WHERE user_id = $1 ORDER BY date DESC, created_at DESC LIMIT 400", [id]);
   const inPeriod = checkins.filter((ch) => ch.date >= startDate && !["guild", "casual"].includes(ch.via));
-  const [token, raffle, payments, bonusNow, bonuses, prizes, guildRows, unlogged, secondFree] = await Promise.all([
+  const [token, raffle, payments, bonusNow, bonuses, prizes, guildRows, unlogged, secondFree, paidDay, paidCash] = await Promise.all([
     one("SELECT * FROM token_uses WHERE user_id = $1 AND month = $2", [id, month]),
     q("SELECT number, source FROM raffle_entries WHERE user_id = $1 AND year = $2 ORDER BY number", [id, lp.year]),
     q("SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10", [id]),
@@ -257,11 +259,13 @@ app.get("/api/me/dashboard", async (c) => {
     q("SELECT * FROM guilds WHERE id = ANY($1::text[]) ORDER BY name", [user.guild_ids ?? []]),
     unloggedCheckins(id),
     freeEntry(user) ? false : paidEarlier(id, slotDate),
+    isPaidMeetupDay(slotDate),
+    freeEntry(user) ? false : cashPass(id, slotDate, slot),
   ]);
   const todayCheckin = checkins.find((ch) => ch.date === slotDate && (ch.session ?? "day") === slot) ?? null;
   return c.json({
     user: meView(user), today: slotDate, checked_in_today: Boolean(todayCheckin),
-    session: { key: slot, label: SESSION_LABELS[slot] }, second_session_free: secondFree,
+    session: { key: slot, label: SESSION_LABELS[slot] }, second_session_free: secondFree, cash_entry: paidCash || false, paid_meetup_day: paidDay,
     today_checkin: todayCheckin, free_entry: freeEntry(user), unlogged_dates: unlogged,
     attendance: { sessions: inPeriod.length, since: startDate,
       door_value_cents: new Set(inPeriod.map((ch) => ch.date)).size * CHECKIN_CENTS, membership_cents: ANNUAL_CENTS },
@@ -270,6 +274,8 @@ app.get("/api/me/dashboard", async (c) => {
     raffle_entry_cents: raffleCents(), bonus: { current: bonusNow, awarded: bonuses, entries: BONUS_ENTRIES },
     prizes, today_date: ld, guilds: guildRows,
     guild_checkins_today: checkins.filter((ch) => ch.date === slotDate && ch.via === "guild").map((ch) => ch.guild_id),
+    guild_checkin_ids: Object.fromEntries(checkins.filter((ch) => ch.date === slotDate && ch.via === "guild")
+      .map((ch) => [ch.guild_id, ch.id])),
     casual_checkin_today: checkins.find((ch) => ch.date === slotDate && ch.via === "casual") ?? null,
     payments: payments.map(paymentView),
   });
@@ -320,6 +326,9 @@ app.post("/api/checkin/family", async (c) => {
   return c.json({ ok: true, added: added.length });
 });
 
+const isPaidMeetupDay = async (d) => Boolean(await one("SELECT 1 FROM paid_meetup_days WHERE date = $1", [d]));
+const PAID_DAY_MSG = "Today is an official paid meetup, so free casual and guild check-ins are off. Use the session check-in instead";
+
 async function insertCheckin(doc, dupMsg) {
   try {
     await q(`INSERT INTO checkins (id, user_id, date, session, via, family, guild_id, guild_name, created_at)
@@ -335,12 +344,24 @@ app.post("/api/checkin", async (c) => {
   const user = await currentUser(c);
   const [d, s] = currentSlot();
   let via;
+  let pass;
   if (freeEntry(user)) via = isSubscriber(user) ? "subscription" : "staff";
+  else if ((pass = await cashPass(user.user_id, d, s))) via = pass === "cash" ? "cash" : "paid";
   else if (await paidEarlier(user.user_id, d)) via = "paid_earlier";
   else fail(402, "Admission is $5. Use check in & pay");
   const family = eligibleFamily(user, idList(await body(c), "family_ids"));
   await insertCheckin({ user_id: user.user_id, date: d, session: s, via, family }, "You're already checked in for this session");
   return c.json({ ok: true, date: d, session: s });
+});
+
+// Undo your own check-in for today (checked in by accident). A paid $5 stays on record for the session, so
+// checking in again later doesn't charge twice.
+app.delete("/api/checkin/:id", async (c) => {
+  const user = await currentUser(c);
+  const row = await one("SELECT * FROM checkins WHERE id = $1 AND user_id = $2", [c.req.param("id"), user.user_id]);
+  if (!row) fail(404, "Check-in not found");
+  if (row.date !== currentSlot()[0]) fail(400, "Only today's check-ins can be undone. Ask a host to fix older ones");
+  return c.json({ ok: true, unmarked_logs: await removeCheckin(row) });
 });
 
 // ---------- Monthly game choice token ----------
@@ -369,11 +390,13 @@ app.post("/api/logs", async (c) => {
   const playerCount = int(b, "player_count", { min: 1, max: 30 });
   const playerId = str(b, "player_id", { min: 1, max: 40 });
   const playtime = int(b, "playtime_min", { min: 1, max: 1440 });
-  const score = int(b, "score", { min: -100000, max: 10000000 });
+  // Score is optional: many games have no score, health or victory points. 0 is a valid score (e.g. health hit 0).
+  const score = int(b, "score", { min: -100000, max: 10000000, optional: true }) ?? null;
   const placement = int(b, "placement", { min: 1, max: 30 });
   const atMeetup = b.at_meetup === true;
   if (!GENRES.includes(genre)) fail(400, "Pick a genre from the list");
-  if (placement > playerCount) fail(400, "Placement can't be higher than the player count");
+  if (placement > playerCount)
+    fail(400, `Placement (${placement}) can't be higher than the number of players (${playerCount}). Count everyone at the table, not teams`);
   const today = localDate();
   const played = (str(b, "played_at", { optional: true }) || currentSlot()[0]).slice(0, 10);
   if (!isDateStr(played)) fail(400, "Invalid date");
@@ -412,7 +435,7 @@ app.delete("/api/logs/:log_id", async (c) => {
 
 app.get("/api/meta/genres", (c) => c.json(GENRES));
 
-const STATS = `sum(score)::float8 AS total_score, count(*)::int AS games,
+const STATS = `COALESCE(sum(score), 0)::float8 AS total_score, count(*)::int AS games,
   (count(*) FILTER (WHERE placement = 1))::int AS wins, sum(playtime_min)::float8 AS playtime_min`;
 
 app.get("/api/leaderboards", async (c) => {
@@ -495,6 +518,7 @@ app.post("/api/checkin/guild", async (c) => {
   if (!g) fail(404, "Guild not found");
   if (!(user.guild_ids ?? []).includes(gid)) fail(403, "Only members of this guild can check in to its meet-ups");
   const [d] = currentSlot();
+  if (await isPaidMeetupDay(d)) fail(403, PAID_DAY_MSG);
   const family = eligibleFamily(user, idList(b, "family_ids"));
   await insertCheckin({ user_id: user.user_id, date: d, session: `guild:${g.id}`, via: "guild", guild_id: g.id,
     guild_name: g.name, family }, `You're already checked in to today's ${g.name} meet-up`);
@@ -504,6 +528,7 @@ app.post("/api/checkin/guild", async (c) => {
 app.post("/api/checkin/casual", async (c) => {
   const user = await currentUser(c);
   const [d] = currentSlot();
+  if (await isPaidMeetupDay(d)) fail(403, PAID_DAY_MSG);
   const family = eligibleFamily(user, idList(await body(c), "family_ids"));
   await insertCheckin({ user_id: user.user_id, date: d, session: "casual", via: "casual", family },
     "You're already checked in to a casual meetup today");
@@ -637,15 +662,87 @@ app.get("/api/admin/checkins", async (c) => {
   if (rows.some((r) => r.via === "casual")) labels.casual = "Casual meetup (unofficial)";
   const heads = Object.fromEntries(Object.keys(labels).map((s) => [s,
     rows.filter((r) => (r.session ?? "day") === s).reduce((a, r) => a + 1 + (r.family ?? []).length, 0)]));
-  return c.json({ date: d, headcount: Object.keys(SESSION_LABELS).reduce((a, s) => a + heads[s], 0),
+  const lock = await one("SELECT * FROM paid_meetup_days WHERE date = $1", [d]);
+  return c.json({ date: d, paid_meetup_day: Boolean(lock), paid_meetup_set_by: lock?.set_by ?? null,
+    headcount: Object.keys(SESSION_LABELS).reduce((a, s) => a + heads[s], 0),
     session_headcount: heads, session_labels: labels,
     rows: rows.map(({ user_name, subscription_expires_at, ...r }) => ({ ...r, name: user_name ?? null, family: r.family ?? [],
       session: r.session ?? "day", is_subscriber: isSubscriber({ subscription_expires_at }) })) });
 });
 
+// Hosts mark a date as an official paid meetup: free casual and guild check-ins are switched off for that date.
+app.put("/api/admin/paid-days/:date", async (c) => {
+  const staff = await requireStaff(c);
+  const d = c.req.param("date");
+  if (!isDateStr(d)) fail(400, "Invalid date");
+  if (d < addDays(localDate(), -1)) fail(400, "Pick today or a future date");
+  await q(`INSERT INTO paid_meetup_days (date, set_by, created_at) VALUES ($1, $2, $3)
+    ON CONFLICT (date) DO UPDATE SET set_by = EXCLUDED.set_by`, [d, staff.name, now()]);
+  return c.json({ ok: true, date: d, paid_meetup_day: true });
+});
+
+app.delete("/api/admin/paid-days/:date", async (c) => {
+  await requireStaff(c);
+  await q("DELETE FROM paid_meetup_days WHERE date = $1", [c.req.param("date")]);
+  return c.json({ ok: true, date: c.req.param("date"), paid_meetup_day: false });
+});
+
+app.get("/api/admin/paid-days", async (c) => {
+  await requireStaff(c);
+  return c.json(await q("SELECT * FROM paid_meetup_days WHERE date >= $1 ORDER BY date LIMIT 100", [addDays(localDate(), -1)]));
+});
+
+// Hosts can remove any check-in from the roster (e.g. a host who checked in by accident).
+app.delete("/api/admin/checkins/:id", async (c) => {
+  await requireStaff(c);
+  const row = await one("SELECT * FROM checkins WHERE id = $1", [c.req.param("id")]);
+  if (!row) fail(404, "Check-in not found");
+  return c.json({ ok: true, unmarked_logs: await removeCheckin(row) });
+});
+
 app.get("/api/admin/users", async (c) => {
   await requireStaff(c);
-  return c.json((await q("SELECT * FROM users ORDER BY name LIMIT 2000")).map(meView));
+  const [d, s] = currentSlot();
+  const [users, passes, inNow] = await Promise.all([
+    q("SELECT * FROM users ORDER BY name LIMIT 2000"),
+    q(`SELECT user_id FROM payments WHERE product = 'checkin' AND method = 'cash' AND status = 'COMPLETED'
+       AND meta->>'date' = $1 AND meta->>'session' = $2`, [d, s]),
+    q("SELECT user_id FROM checkins WHERE date = $1 AND session = $2", [d, s]),
+  ]);
+  const paid = new Set(passes.map((r) => r.user_id));
+  const checked = new Set(inNow.map((r) => r.user_id));
+  return c.json(users.map((u) => ({ ...meView(u), free_entry: freeEntry(u), cash_entry_now: paid.has(u.user_id),
+    checked_in_now: checked.has(u.user_id) })));
+});
+
+// A host records that a member paid the $5 admission in cash (or another way off the site) for the
+// current session. The member then checks themselves in free, which lets them log meetup games.
+app.post("/api/admin/users/:user_id/cash-entry", async (c) => {
+  const staff = await requireStaff(c);
+  const target = await getUserById(c.req.param("user_id"));
+  if (!target) fail(404, "User not found");
+  if (freeEntry(target)) fail(400, `${target.name} already gets free entry`);
+  const [d, s] = currentSlot();
+  if (await cashPass(target.user_id, d, s)) fail(400, `${target.name} is already marked as paid for this session`);
+  if (await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND session = $3", [target.user_id, d, s]))
+    fail(400, `${target.name} is already checked in for this session`);
+  await q(`INSERT INTO payments (checkout_id, user_id, product, label, amount_cents, currency, status, method,
+      recorded_by, meta, fulfilled, created_at, paid_at)
+    VALUES ($1, $2, 'checkin', 'Session Admission (paid to host)', $3, 'AUD', 'COMPLETED', 'cash', $4, $5::jsonb, false, $6, $6)`,
+  [`cash_${uid()}`, target.user_id, CHECKIN_CENTS, staff.name, json({ date: d, session: s }), now()]);
+  return c.json({ ok: true, date: d, session: s, label: SESSION_LABELS[s] });
+});
+
+app.delete("/api/admin/users/:user_id/cash-entry", async (c) => {
+  await requireStaff(c);
+  const userId = c.req.param("user_id");
+  const [d, s] = currentSlot();
+  if (await one("SELECT 1 FROM checkins WHERE user_id = $1 AND date = $2 AND session = $3 AND via = 'cash'", [userId, d, s]))
+    fail(400, "They've already checked in with this entry, so it can't be undone");
+  const r = await one(`UPDATE payments SET status = 'CANCELED' WHERE user_id = $1 AND product = 'checkin' AND method = 'cash'
+      AND status = 'COMPLETED' AND meta->>'date' = $2 AND meta->>'session' = $3 RETURNING checkout_id`, [userId, d, s]);
+  if (!r) fail(404, "No paid entry recorded for this session");
+  return c.json({ ok: true });
 });
 
 app.post("/api/admin/users/:user_id/role", async (c) => {
@@ -687,7 +784,7 @@ app.get("/api/admin/sessions", async (c) => {
       player_count: lg.player_count, playtime_min: lg.playtime_min });
   }
   const out = [...games.values()].sort((a, b) => b.plays - a.plays).map((g) => ({
-    ...g, entries: g.entries.sort((a, b) => a.placement - b.placement || b.score - a.score), players: g.players.size }));
+    ...g, entries: g.entries.sort((a, b) => a.placement - b.placement || (b.score ?? -Infinity) - (a.score ?? -Infinity)), players: g.players.size }));
   const recent = (await q("SELECT date FROM checkins UNION SELECT played_at FROM game_logs ORDER BY 1 DESC LIMIT 30")).map((r) => r.date);
   const dayRows = await q("SELECT family FROM checkins WHERE date = $1 LIMIT 500", [d]);
   return c.json({ date: d, attendees: dayRows.reduce((a, r) => a + 1 + (r.family ?? []).length, 0), logs: logs.length,
@@ -760,7 +857,7 @@ app.get("/api/games/details", async (c) => {
     score: lg.score, placement: lg.placement, player_count: lg.player_count, played_at: lg.played_at }));
   return c.json({ owners: [...owners.values()].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())), recent,
     stats: { plays: logs.length, players: new Set(logs.map((lg) => lg.user_id)).size,
-      top_score: logs.length ? Math.max(...logs.map((lg) => lg.score)) : null } });
+      top_score: logs.some((lg) => lg.score !== null) ? Math.max(...logs.filter((lg) => lg.score !== null).map((lg) => lg.score)) : null } });
 });
 
 // ---------- One-off MongoDB import (admin only; used by scripts/import-mongo.mjs) ----------
